@@ -48,18 +48,84 @@ export const resolveAssetUrl = (url) => {
   return trimmed;
 };
 
-export const testServerHealth = async (customUrl) => {
-  const target = (customUrl ? customUrl.replace(/\/+$/, '') : getServerBaseUrl()) + '/api/health';
+/**
+ * Determines whether an Axios/fetch error indicates the backend server could not be reached
+ * (network error, timeout, firewall drop, or WebView/CORS block) rather than an API validation error.
+ */
+export const isBackendUnreachableError = (err) => {
+  if (!err || err.response) return false;
+  const code = err.code || '';
+  const msg = String(err.message || '');
+  return (
+    code === 'ERR_NETWORK' ||
+    code === 'ECONNABORTED' ||
+    code === 'ETIMEDOUT' ||
+    /network|timeout|aborted|failed to fetch|load failed/i.test(msg)
+  );
+};
+
+/**
+ * Probes `${url}/api/health` and returns diagnostic details distinguishing timeouts
+ * (typical of firewall/router isolation drops) from immediate refusals/network errors.
+ */
+export const probeServerConnection = async (customUrl, timeoutMs = 4000) => {
+  const baseUrl = customUrl ? customUrl.replace(/\/+$/, '') : getServerBaseUrl();
+  const target = `${baseUrl}/api/health`;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 3500);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(target, { signal: controller.signal });
+    const res = await fetch(target, { signal: controller.signal, cache: 'no-store' });
     clearTimeout(timer);
-    return res.ok;
+    return {
+      ok: res.ok,
+      reason: res.ok ? 'ok' : 'http_error',
+      status: res.status,
+      url: baseUrl
+    };
   } catch (err) {
     clearTimeout(timer);
-    return false;
+    return {
+      ok: false,
+      reason: err?.name === 'AbortError' ? 'timeout' : 'unreachable',
+      status: 0,
+      url: baseUrl
+    };
   }
+};
+
+export const formatBackendUnreachableMessage = (err, serverUrl, isUrdu) => {
+  const isTimeout = err?.code === 'ECONNABORTED' || err?.code === 'ETIMEDOUT' || /timeout/i.test(err?.message || '');
+  if (isUrdu) {
+    return isTimeout
+      ? `سرور (${serverUrl}) سے جواب وقت پر نہیں ملا۔ ونڈوز فائر وال (Port 5000) یا Wi-Fi چیک کریں۔`
+      : `سرور (${serverUrl}) سے رابطہ نہیں ہو سکا۔ برائے مہربانی نیچے آئی پی ایڈریس، ایک ہی Wi-Fi اور فائر وال (Port 5000) چیک کریں۔`;
+  }
+  return isTimeout
+    ? `Timed out connecting to ${serverUrl}. Check Windows Firewall (Port 5000) or Wi-Fi isolation.`
+    : `Cannot reach backend at ${serverUrl}. Ensure same Wi-Fi, Port 5000 is open in Windows Firewall, or update the Server IP below.`;
+};
+
+export const formatProbeStatusMessage = (probe, isUrdu, isReset = false) => {
+  const url = probe?.url || getServerBaseUrl();
+  if (probe?.ok) {
+    if (isReset) {
+      return isUrdu ? `ڈیفالٹ آئی پی پر بحال اور منسلک (${url})` : `Reset to default & connected (${url})`;
+    }
+    return isUrdu ? `رابطہ کامیاب! (${url})` : `Connected to ${url}`;
+  }
+  if (probe?.reason === 'timeout') {
+    return isUrdu
+      ? `آئی پی محفوظ، مگر ${url} پر وقت ختم ہو گیا (ونڈوز فائر وال Port 5000 یا راؤٹر چیک کریں)۔`
+      : `Saved IP, but ${url} timed out (check Windows Firewall Port 5000 or router AP isolation).`;
+  }
+  return isUrdu
+    ? `${isReset ? 'ڈیفالٹ آئی پی بحال' : 'آئی پی محفوظ'}، مگر ${url} سے جواب نہیں ملا۔ Wi-Fi اور سرور چیک کریں۔`
+    : `${isReset ? 'Reset IP' : 'Saved IP'}, but cannot reach ${url}. Check Wi-Fi, Firewall & server.`;
+};
+
+export const testServerHealth = async (customUrl, timeoutMs = 4000) => {
+  const result = await probeServerConnection(customUrl, timeoutMs);
+  return result.ok;
 };
 
 export const API_URL = getApiUrl();

@@ -56,7 +56,7 @@ export default function UnitInput({
   const unitsList = getUnits();
 
   return (
-    <div className={`space-y-1 text-left ${className}`}>
+    <div className={`space-y-1 text-left w-full min-w-0 ${className}`}>
       {label && (
         <label className={`block text-[11px] font-extrabold uppercase tracking-wider ${
           isInvalid ? 'text-rose-400' : 'text-slate-200'
@@ -67,7 +67,7 @@ export default function UnitInput({
       )}
 
       {/* Input + Dropdown Group */}
-      <div className={`flex rounded-xl overflow-hidden transition-all duration-200 border ${
+      <div className={`flex w-full min-w-0 rounded-xl overflow-hidden transition-all duration-200 border ${
         isInvalid
           ? 'bg-rose-500/15 border-2 border-rose-500/80 ring-2 ring-rose-500/25 shadow-xs'
           : 'bg-[#0F1930]/80 border-white/15 hover:border-white/30 focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/25 shadow-2xs'
@@ -86,16 +86,16 @@ export default function UnitInput({
           }`}
         />
 
-        <div className="border-l border-white/15 bg-white/[0.06] flex items-center shrink-0">
+        <div className="border-l border-white/15 bg-white/[0.06] flex items-center shrink-0 min-w-0 max-w-[52%] sm:max-w-none">
           <select
             value={activeUnit}
             onChange={(e) => onUnitChange && onUnitChange(e.target.value)}
             aria-label={`${label || 'Measurement'} unit`}
-            className="bg-transparent border-0 text-[11px] font-bold text-slate-200 px-2 sm:px-2.5 py-2 outline-none focus:ring-0 cursor-pointer hover:bg-white/10 transition-colors max-w-[115px] sm:max-w-none truncate"
+            className="w-full bg-transparent border-0 text-[11px] font-bold text-slate-200 px-2 sm:px-2.5 py-2 outline-none focus:ring-0 cursor-pointer hover:bg-white/10 transition-colors truncate"
           >
             {unitsList.map((u) => (
               <option key={u.id} value={u.id} className="bg-[#0B1325] text-slate-100 font-medium">
-                {u.label || u.name}
+                {u.label || u.name || u.id}
               </option>
             ))}
           </select>

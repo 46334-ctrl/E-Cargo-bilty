@@ -35,7 +35,10 @@ import {
   getStoredServerIP,
   getServerBaseUrl,
   setStoredServerIP,
-  testServerHealth
+  probeServerConnection,
+  isBackendUnreachableError,
+  formatBackendUnreachableMessage,
+  formatProbeStatusMessage
 } from '../api';
 import {
   formatCNIC,
@@ -317,14 +320,10 @@ export default function Register() {
         navigate('/shipper/dashboard', { replace: true });
       }
     } catch (err) {
-      if (err.code === 'ERR_NETWORK' || err.message === 'Network Error' || err.message?.includes('Network')) {
+      if (isBackendUnreachableError(err)) {
         const activeUrl = getServerBaseUrl();
         setShowIpEditor(true);
-        setError(
-          isUrdu
-            ? `سرور (${activeUrl}) سے رابطہ نہیں ہو سکا۔ نیچے آئی پی ایڈریس چیک کریں۔`
-            : `Cannot reach backend at ${activeUrl}. Update the Server IP below if your Wi-Fi changed.`
-        );
+        setError(formatBackendUnreachableMessage(err, activeUrl, isUrdu));
       } else {
         setError(
           err.response?.data?.message ||
@@ -346,22 +345,15 @@ export default function Register() {
     setIpStatus({ message: '', ok: true });
     const newBaseUrl = setStoredServerIP(trimmed);
     setCurrentServerUrl(newBaseUrl);
-    const healthy = await testServerHealth(newBaseUrl);
+    const probe = await probeServerConnection(newBaseUrl);
     setSavingIp(false);
-    if (healthy) {
+    if (probe.ok) {
       setError('');
-      setIpStatus({
-        message: isUrdu ? `رابطہ کامیاب! (${newBaseUrl})` : `Connected to ${newBaseUrl}`,
-        ok: true
-      });
-    } else {
-      setIpStatus({
-        message: isUrdu
-          ? `آئی پی محفوظ ہو گیا، مگر ${newBaseUrl} سے جواب نہیں ملا۔`
-          : `Saved IP, but cannot reach ${newBaseUrl}. Check Wi-Fi & server.`,
-        ok: false
-      });
     }
+    setIpStatus({
+      message: formatProbeStatusMessage(probe, isUrdu, false),
+      ok: probe.ok
+    });
   };
 
   const handleResetIp = async () => {
@@ -370,13 +362,14 @@ export default function Register() {
     setIpStatus({ message: '', ok: true });
     const newBaseUrl = setStoredServerIP('');
     setCurrentServerUrl(newBaseUrl);
-    const healthy = await testServerHealth(newBaseUrl);
+    const probe = await probeServerConnection(newBaseUrl);
     setSavingIp(false);
+    if (probe.ok) {
+      setError('');
+    }
     setIpStatus({
-      message: healthy
-        ? (isUrdu ? `ڈیفالٹ آئی پی پر بحال (${newBaseUrl})` : `Reset to default & connected (${newBaseUrl})`)
-        : (isUrdu ? `ڈیفالٹ آئی پی پر بحال: ${newBaseUrl}` : `Reset to default: ${newBaseUrl}`),
-      ok: healthy
+      message: formatProbeStatusMessage(probe, isUrdu, true),
+      ok: probe.ok
     });
   };
 
@@ -443,7 +436,7 @@ export default function Register() {
       </div>
 
       {/* Centered 3D Registration Stage */}
-      <div className="flex-1 flex flex-col items-center justify-center min-h-[calc(100dvh-4.5rem)] py-6 sm:py-9 px-3.5 sm:px-4 relative z-10 perspective-1200">
+      <div className="flex-1 flex flex-col items-center py-4 sm:py-9 px-3 sm:px-4 relative z-10 perspective-1200">
         <div className="w-full max-w-2xl z-10 my-auto page-enter preserve-3d">
           <Tilt3DCard
             maxTilt={2.2}

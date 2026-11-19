@@ -32,7 +32,7 @@ export default function Profile() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-3 sm:px-4 py-5 sm:py-10 relative page-enter">
+    <div className="w-full min-w-0 max-w-4xl mx-auto px-3 sm:px-4 py-5 sm:py-10 relative page-enter">
       <div className="mb-5 sm:mb-6 relative z-10">
         <TruckPoetryBanner />
       </div>

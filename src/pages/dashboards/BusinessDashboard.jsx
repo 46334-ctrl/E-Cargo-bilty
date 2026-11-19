@@ -516,7 +516,7 @@ export default function BusinessDashboard() {
   };
 
   return (
-    <div className="dash-dark-theme max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-5 sm:py-8 relative page-enter">
+    <div className="dash-dark-theme w-full min-w-0 max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-5 sm:py-8 relative page-enter">
       {/* Truck Poetry Banner */}
       <div className="mb-6 relative z-10">
         <TruckPoetryBanner />
@@ -525,7 +525,7 @@ export default function BusinessDashboard() {
       {/* Command Header Panel */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6 relative z-10 rounded-2xl sm:rounded-3xl bg-[#0B1325]/96 border border-white/15 p-4 sm:p-6 shadow-[0_18px_48px_-14px_rgba(0,0,0,0.75)] overflow-hidden">
         <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-[#EA580C] via-[#F89020] to-cyan-400" />
-        <div className="text-left">
+        <div className="text-left min-w-0 w-full">
           <div className="flex items-center gap-2 mb-2 flex-wrap">
             <TruckMorBadge />
             {isUrdu && <span className="text-[11px] font-bold uppercase tracking-widest text-emerald-300 bg-emerald-500/15 px-2.5 py-0.5 rounded-full border border-emerald-400/35 font-urdu">شاہراہِ پاکستان</span>}
@@ -545,7 +545,7 @@ export default function BusinessDashboard() {
       </div>
 
       {/* Tabs Navigation (Obsidian Segmented Dock) */}
-      <div className="mb-6 sm:mb-8 relative z-10 overflow-x-auto touch-scroll no-scrollbar">
+      <div className="w-full max-w-full min-w-0 mb-6 sm:mb-8 relative z-10 overflow-x-auto touch-scroll no-scrollbar">
         <nav className="inline-flex min-w-full sm:min-w-0 items-center gap-1.5 p-1.5 rounded-2xl bg-[#0B1325]/96 border border-white/15 shadow-[0_12px_28px_rgba(0,0,0,0.45)]">
           {[
             { id: 'new-request', name: 'New Request' },
@@ -584,14 +584,14 @@ export default function BusinessDashboard() {
             <form onSubmit={(e) => handleRequestSubmit(e, 'Pending')} className="space-y-8 text-left">
 
               {/* Step 1: SELECT TRANSPORTER */}
-              <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-6 space-y-4">
-                <div className="flex justify-between items-center">
+              <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-4 sm:p-6 space-y-4 overflow-hidden">
+                <div className="flex flex-wrap justify-between items-center gap-2">
                   <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-full bg-orange-600 text-white font-bold flex items-center justify-center text-xs shadow-2xs">1</span>
-                    {isUrdu ? 'ٹرانسپورٹر کا انتخاب' : 'Select Transporter'}
+                    <span className="w-6 h-6 rounded-full bg-orange-600 text-white font-bold flex items-center justify-center text-xs shadow-2xs shrink-0">1</span>
+                    <span>{isUrdu ? 'ٹرانسپورٹر کا انتخاب' : 'Select Transporter'}</span>
                   </h3>
                   {selectedTransporter && (
-                    <span className="text-xs font-mono text-orange-700 bg-orange-50 px-2.5 py-1 rounded-lg border border-orange-200 font-bold shadow-2xs">
+                    <span className="text-xs font-mono text-orange-700 bg-orange-50 px-2.5 py-1 rounded-lg border border-orange-200 font-bold shadow-2xs max-w-full truncate">
                       Selected: {selectedTransporter.name}
                     </span>
                   )}
@@ -618,7 +618,7 @@ export default function BusinessDashboard() {
                           });
                         }
                       }}
-                      className={`p-5 rounded-2xl border text-left cursor-pointer transition-all duration-300 relative overflow-hidden ${selectedTransporter?._id === t._id
+                      className={`p-4 sm:p-5 rounded-2xl border text-left cursor-pointer transition-all duration-300 relative overflow-hidden ${selectedTransporter?._id === t._id
                           ? 'bg-orange-50/50 border-2 border-orange-600 shadow-sm -translate-y-0.5'
                           : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
                         }`}
@@ -626,20 +626,20 @@ export default function BusinessDashboard() {
                       {selectedTransporter?._id === t._id && (
                         <div className="absolute top-0 left-0 bottom-0 w-1 bg-[#F89020]" />
                       )}
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h4 className="font-bold text-slate-900 text-base">{t.name}</h4>
+                      <div className="flex justify-between items-start gap-2">
+                        <div className="min-w-0 flex-1">
+                          <h4 className="font-bold text-slate-900 text-base truncate">{t.name}</h4>
                           <p className="text-xs text-slate-600 mt-1 font-mono">{t.phone || 'Contact via portal'} &middot; {t.shipmentsCount || 0} shipments</p>
                           <p className="text-[11px] text-slate-500 mt-3 font-medium">{t.businessName ? `${t.businessName} · Verified Network` : 'Verified National Carrier'}</p>
                         </div>
-                        <span className="text-xs font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200 font-mono shadow-2xs">
+                        <span className="text-xs font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200 font-mono shadow-2xs shrink-0">
                           {getTransporterRating(t.shipmentsCount || 0)}
                         </span>
                       </div>
                     </div>
                   ))}
                   {transporters.length === 0 && (
-                    <div className="col-span-2 text-center py-8 text-slate-500 italic bg-slate-50 rounded-2xl border border-slate-200">
+                    <div className="col-span-full text-center py-8 px-4 text-slate-500 italic bg-slate-50 rounded-2xl border border-slate-200">
                       No transporters available. Please verify registered transporters in Admin panel.
                     </div>
                   )}
@@ -647,19 +647,19 @@ export default function BusinessDashboard() {
               </div>
 
               {/* Step 2: PRODUCTS, PACKAGING & VOLUMETRIC SPECS */}
-              <div className="bg-white border border-slate-200 shadow-xs rounded-2xl p-6 space-y-4">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                  <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-full bg-orange-600 text-white font-bold flex items-center justify-center text-xs shadow-2xs">2</span>
-                    {isUrdu ? 'مال کی تفصیلات اور پیمائش' : 'Cargo Products, Packaging & Unit Dimensions'}
+              <div className="bg-white border border-slate-200 shadow-xs rounded-2xl p-4 sm:p-6 space-y-4 overflow-hidden">
+                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-3">
+                  <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2 min-w-0">
+                    <span className="w-6 h-6 rounded-full bg-orange-600 text-white font-bold flex items-center justify-center text-xs shadow-2xs shrink-0">2</span>
+                    <span className="leading-snug">{isUrdu ? 'مال کی تفصیلات اور پیمائش' : 'Cargo Products, Packaging & Unit Dimensions'}</span>
                   </h3>
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2">
-                      <label className="text-[10px] font-bold text-slate-600 uppercase font-mono">Packaging:</label>
+                  <div className="flex flex-wrap items-center justify-between gap-2.5 w-full lg:w-auto">
+                    <div className="flex items-center gap-2 min-w-0 flex-1 sm:flex-initial">
+                      <label className="text-[10px] font-bold text-slate-600 uppercase font-mono shrink-0">Packaging:</label>
                       <select
                         value={packagingType}
                         onChange={e => setPackagingType(e.target.value)}
-                        className="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1 text-slate-900 text-xs font-semibold outline-none focus:border-orange-500"
+                        className="w-full sm:w-auto min-w-0 bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 text-slate-900 text-xs font-semibold outline-none focus:border-orange-500"
                       >
                         {PACKAGING_TYPES.map(pkg => (
                           <option key={pkg} value={pkg}>{pkg}</option>
@@ -669,9 +669,9 @@ export default function BusinessDashboard() {
                     <button
                       type="button"
                       onClick={addProductRow}
-                      className="btn-outline text-xs !py-1.5 !px-3"
+                      className="btn-outline text-xs !py-1.5 !px-3 shrink-0 whitespace-nowrap"
                     >
-                      <Plus size={14} /> Add Product
+                      <Plus size={14} className="shrink-0" /> Add Product
                     </button>
                   </div>
                 </div>
@@ -690,7 +690,7 @@ export default function BusinessDashboard() {
                     const grossItemTons = (parseFloat(prod.qty) || 0) * convertToTons(prod.unitWeight, prod.weightUnit || 'ton');
 
                     return (
-                      <div key={idx} className="bg-slate-50 border border-slate-200 p-4 rounded-xl relative space-y-3">
+                      <div key={idx} className={`bg-slate-50 border border-slate-200 p-3.5 sm:p-4 rounded-xl relative space-y-3 ${products.length > 1 ? 'pr-8' : ''}`}>
                         {products.length > 1 && (
                           <button
                             type="button"
@@ -702,7 +702,7 @@ export default function BusinessDashboard() {
                         )}
 
                         <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-start">
-                          <div className="md:col-span-3">
+                          <div className="md:col-span-3 min-w-0">
                             <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1">
                               Product Name <span className="text-red-500">*</span>
                             </label>
@@ -719,7 +719,7 @@ export default function BusinessDashboard() {
                             )}
                           </div>
 
-                          <div className="md:col-span-2">
+                          <div className="md:col-span-2 min-w-0">
                             <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1">
                               Quantity <span className="text-red-500">*</span>
                             </label>
@@ -737,7 +737,7 @@ export default function BusinessDashboard() {
                             )}
                           </div>
 
-                          <div className="md:col-span-3">
+                          <div className="md:col-span-3 min-w-0">
                             <UnitInput
                               label="Unit Weight"
                               value={prod.unitWeight}
@@ -752,7 +752,7 @@ export default function BusinessDashboard() {
                             />
                           </div>
 
-                          <div className="md:col-span-2">
+                          <div className="md:col-span-2 min-w-0">
                             <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Gross Item Wt</label>
                             <input
                               disabled
@@ -762,7 +762,7 @@ export default function BusinessDashboard() {
                             />
                           </div>
 
-                          <div className="md:col-span-2">
+                          <div className="md:col-span-2 min-w-0">
                             <label className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1">Category</label>
                             <select
                               value={prod.type}
@@ -771,7 +771,7 @@ export default function BusinessDashboard() {
                             >
                               {CARGO_CATEGORIES.map(cat => (
                                 <option key={cat.id} value={cat.id}>
-                                  {cat.name} {isUrdu ? `(${cat.urdu})` : ''}
+                                  {cat.label || cat.name || cat.id} {isUrdu && cat.urdu ? `(${cat.urdu})` : ''}
                                 </option>
                               ))}
                             </select>
@@ -780,7 +780,7 @@ export default function BusinessDashboard() {
 
                         {/* Volumetric Dimensions Row with Unit Selector */}
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5 sm:gap-3 pt-2 border-t border-slate-200 items-end">
-                          <div>
+                          <div className="min-w-0">
                             <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">
                               Length ({prod.dimensionUnit || 'cm'})
                             </label>
@@ -793,7 +793,7 @@ export default function BusinessDashboard() {
                               placeholder="e.g. 120"
                             />
                           </div>
-                          <div>
+                          <div className="min-w-0">
                             <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">
                               Width ({prod.dimensionUnit || 'cm'})
                             </label>
@@ -806,7 +806,7 @@ export default function BusinessDashboard() {
                               placeholder="e.g. 80"
                             />
                           </div>
-                          <div>
+                          <div className="min-w-0">
                             <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">
                               Height ({prod.dimensionUnit || 'cm'})
                             </label>
@@ -819,7 +819,7 @@ export default function BusinessDashboard() {
                               placeholder="e.g. 160"
                             />
                           </div>
-                          <div>
+                          <div className="min-w-0">
                             <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">Dimension Unit</label>
                             <select
                               value={prod.dimensionUnit || 'cm'}
@@ -827,17 +827,17 @@ export default function BusinessDashboard() {
                               className="w-full bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-slate-900 text-xs font-semibold outline-none focus:border-orange-500"
                             >
                               {DIMENSION_UNITS.map(u => (
-                                <option key={u.id} value={u.id}>{u.name} ({u.label})</option>
+                                <option key={u.id} value={u.id}>{u.label || u.name || u.id}</option>
                               ))}
                             </select>
                           </div>
-                          <div>
+                          <div className="min-w-0">
                             <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">Volumetric Wt</label>
                             <div className="bg-orange-50 border border-orange-200 rounded-lg px-2.5 py-1.5 text-orange-800 text-xs font-mono font-bold">
                               {vol.tons > 0 ? `${vol.tons.toFixed(2)} tons` : '0.00 tons'}
                             </div>
                           </div>
-                          <div>
+                          <div className="min-w-0">
                             <label className="block text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-1">Chargeable</label>
                             <div className="bg-emerald-50 border border-emerald-300 rounded-lg px-2.5 py-1.5 text-emerald-800 text-xs font-mono font-black">
                               {Math.max(grossItemTons, vol.tons).toFixed(2)} tons
@@ -850,7 +850,7 @@ export default function BusinessDashboard() {
                 </div>
 
                 {/* Weight Totals Bar */}
-                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 font-mono text-xs">
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 sm:p-4 flex flex-wrap items-center justify-between gap-3 sm:gap-4 font-mono text-xs">
                   <div>
                     <span className="text-slate-500 font-bold uppercase text-[10px] block">Gross Weight (Converted)</span>
                     <span className="text-slate-900 font-bold text-sm">{grossWeight.toFixed(2)} Metric Tons</span>
@@ -859,15 +859,15 @@ export default function BusinessDashboard() {
                     <span className="text-slate-500 font-bold uppercase text-[10px] block">Volumetric Weight (IATA Standard)</span>
                     <span className="text-orange-700 font-bold text-sm">{volumetricWeight.toFixed(2)} Metric Tons</span>
                   </div>
-                  <div className="bg-white border border-emerald-500 rounded-xl px-4 py-2 shadow-2xs">
+                  <div className="w-full sm:w-auto bg-white border border-emerald-500 rounded-xl px-3.5 sm:px-4 py-2 shadow-2xs">
                     <span className="text-emerald-700 font-bold uppercase text-[10px] block">Chargeable Freight Weight</span>
-                    <span className="text-emerald-800 font-bold text-base">{chargeableWeight.toFixed(2)} Tons (max of Gross & Volumetric)</span>
+                    <span className="text-emerald-800 font-bold text-sm sm:text-base">{chargeableWeight.toFixed(2)} Tons (max of Gross & Volumetric)</span>
                   </div>
                 </div>
               </div>
 
               {/* Step 3: PICKUP DETAILS */}
-              <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-6 space-y-4">
+              <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-4 sm:p-6 space-y-4 overflow-hidden">
                 <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-orange-600 text-white font-bold flex items-center justify-center text-xs shadow-2xs">3</span>
                   {isUrdu ? 'روانگی کا مقام' : 'Pickup Details & Logistics Hub'}
@@ -975,24 +975,24 @@ export default function BusinessDashboard() {
               </div>
 
               {/* Step 4: RECIPIENTS / CONSIGNEES */}
-              <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-6 space-y-4">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-full bg-orange-600 text-white font-bold flex items-center justify-center text-xs shadow-2xs">4</span>
-                    {isUrdu ? 'وصول کنندگان اور منزل' : 'Recipients / Consignee Destinations'}
+              <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-4 sm:p-6 space-y-4 overflow-hidden">
+                <div className="flex flex-wrap justify-between items-center gap-2.5">
+                  <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2 min-w-0">
+                    <span className="w-6 h-6 rounded-full bg-orange-600 text-white font-bold flex items-center justify-center text-xs shadow-2xs shrink-0">4</span>
+                    <span className="leading-snug">{isUrdu ? 'وصول کنندگان اور منزل' : 'Recipients / Consignee Destinations'}</span>
                   </h3>
                   <button
                     type="button"
                     onClick={addRecipientRow}
-                    className="btn-outline text-xs !py-1.5 !px-3"
+                    className="btn-outline text-xs !py-1.5 !px-3 shrink-0 whitespace-nowrap"
                   >
-                    <Plus size={14} /> Add Recipient
+                    <Plus size={14} className="shrink-0" /> Add Recipient
                   </button>
                 </div>
 
                 <div className="space-y-6">
                   {recipients.map((recip, idx) => (
-                    <div key={idx} className="bg-slate-50 border border-slate-200 p-5 rounded-xl relative space-y-4">
+                    <div key={idx} className={`bg-slate-50 border border-slate-200 p-4 sm:p-5 rounded-xl relative space-y-4 ${recipients.length > 1 ? 'pr-8' : ''}`}>
                       {recipients.length > 1 && (
                         <button
                           type="button"
@@ -1119,7 +1119,7 @@ export default function BusinessDashboard() {
               </div>
 
               {/* Step 5: SPECIAL HANDLING, TAX ID, RATE TYPE & LIVE TARIFF CALCULATOR */}
-              <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-6 space-y-6">
+              <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-4 sm:p-6 space-y-5 sm:space-y-6 overflow-hidden">
                 <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-orange-600 text-white font-bold flex items-center justify-center text-xs shadow-2xs">5</span>
                   {isUrdu ? 'خصوصی ہدایات، ٹیکس اور کرایہ کا تخمینہ' : 'Special Handling, NTN & Automated Fare Tariff'}
@@ -1395,25 +1395,25 @@ export default function BusinessDashboard() {
                 </div>
 
                 {/* Right shipment progress pane */}
-                <div className="lg:col-span-7 bg-white border border-slate-200 rounded-2xl p-6 flex flex-col justify-between text-left shadow-xs relative overflow-hidden">
+                <div className="lg:col-span-7 min-w-0 bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 flex flex-col justify-between text-left shadow-xs relative overflow-hidden">
                   <SindhiTruckTexture />
                   {selectedCargo ? (
-                    <div className="space-y-6 flex-1 flex flex-col justify-between relative z-10">
+                    <div className="space-y-6 flex-1 flex flex-col justify-between relative z-10 min-w-0">
                       <div>
-                        <div className="flex justify-between items-start border-b border-slate-200 pb-4 gap-2">
+                        <div className="flex flex-wrap justify-between items-start border-b border-slate-200 pb-4 gap-2">
                           <div className="min-w-0 flex-1 pr-2">
                             <div className="flex items-center gap-2 mb-1">
-                              <TruckTaj className="text-orange-600 w-5 h-4" />
+                              <TruckTaj className="text-orange-600 w-5 h-4 shrink-0" />
                               <span className="text-[10px] font-bold text-orange-700 uppercase tracking-wider">
                                 {isUrdu ? 'لائیو ٹیلی میٹری ٹریکنگ' : 'Live Telemetry Track'}
                               </span>
                             </div>
-                            <h3 className="text-xl font-bold text-slate-900 break-words">{selectedCargo.title}</h3>
+                            <h3 className="text-lg sm:text-xl font-bold text-slate-900 break-words">{selectedCargo.title}</h3>
                             <p className="text-xs text-slate-600 mt-1">
                               {isUrdu ? 'منزل:' : 'Destination Hub:'} <span className="text-slate-900 font-bold">{selectedCargo.destination}</span>
                             </p>
                           </div>
-                          <div className="flex items-center gap-2 shrink-0">
+                          <div className="flex flex-wrap items-center gap-2 shrink-0">
                             <span className="text-xs font-mono font-bold text-orange-700 bg-orange-50 px-3 py-1.5 rounded-lg border border-orange-200 whitespace-nowrap">
                               {selectedCargo.assignedTruck && selectedCargo.status !== 'Pending' ? `BLT-${selectedCargo.id}` : `SHP-${selectedCargo.id}`}
                             </span>
@@ -1518,7 +1518,7 @@ export default function BusinessDashboard() {
                             ) : null;
                           })()}
                           {selectedCargo.specialHandling && Array.isArray(selectedCargo.specialHandling) && selectedCargo.specialHandling.length > 0 && (
-                            <div className="col-span-2 md:col-span-3 bg-amber-50 p-3 rounded-xl border border-amber-200">
+                            <div className="col-span-full bg-amber-50 p-3 rounded-xl border border-amber-200">
                               <p className="text-[10px] font-bold text-amber-800 uppercase tracking-wider mb-1.5">Special Handling Directives</p>
                               <div className="flex flex-wrap gap-1.5">
                                 {selectedCargo.specialHandling.map((h, i) => (
@@ -1533,11 +1533,11 @@ export default function BusinessDashboard() {
 
                         {/* Transit Progression Line */}
                         {selectedCargo.status !== 'Draft' && (
-                          <div className="mt-8 bg-slate-50 border border-slate-200 p-5 rounded-xl shadow-2xs">
-                            <h4 className="text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-5">Transit Progression</h4>
-                            <div className="flex justify-between items-center relative pl-4 pr-4">
+                          <div className="mt-6 sm:mt-8 bg-slate-50 border border-slate-200 p-3.5 sm:p-5 rounded-xl shadow-2xs">
+                            <h4 className="text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-4 sm:mb-5">Transit Progression</h4>
+                            <div className="flex justify-between items-center relative px-1 sm:px-4 gap-1">
                               {/* Connector line */}
-                              <div className="absolute left-8 right-8 top-1/2 -translate-y-1/2 h-1 bg-slate-200 -z-1"></div>
+                              <div className="absolute left-5 right-5 sm:left-8 sm:right-8 top-1/2 -translate-y-1/2 h-1 bg-slate-200 -z-1"></div>
 
                               {[
                                 { label: 'Pending', step: 'Pending' },
@@ -1603,7 +1603,7 @@ export default function BusinessDashboard() {
           {/* TRANSPORTERS DIRECTORY TAB */}
           {activeTab === 'transporters' && (
             <div className="space-y-6 text-left">
-              <div className="flex justify-between items-center">
+              <div className="flex flex-wrap justify-between items-center gap-2">
                 <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider">
                   {transporters.length} verified transporters available
                 </h3>
@@ -1612,19 +1612,19 @@ export default function BusinessDashboard() {
 
               <div className="space-y-4">
                 {transporters.map(t => (
-                  <div key={t._id} className="bg-white border border-slate-200 rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm hover:shadow-md transition-all duration-200 relative overflow-hidden">
-                    <div className="flex items-start gap-4 relative z-10">
-                      <div className="w-12 h-12 rounded-xl bg-orange-50 border border-orange-200 text-orange-700 flex items-center justify-center shrink-0 shadow-2xs">
+                  <div key={t._id} className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm hover:shadow-md transition-all duration-200 relative overflow-hidden">
+                    <div className="flex items-start gap-3 sm:gap-4 relative z-10 min-w-0 flex-1">
+                      <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-orange-50 border border-orange-200 text-orange-700 flex items-center justify-center shrink-0 shadow-2xs">
                         <Users size={22} />
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2.5">
-                          <h4 className="text-lg font-bold text-slate-900 tracking-wide">{t.name}</h4>
-                          <span className="text-xs text-slate-700 font-bold bg-slate-100 px-2 py-0.5 rounded border border-slate-200 font-mono shadow-2xs">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h4 className="text-base sm:text-lg font-bold text-slate-900 tracking-wide break-words">{t.name}</h4>
+                          <span className="text-xs text-slate-700 font-bold bg-slate-100 px-2 py-0.5 rounded border border-slate-200 font-mono shadow-2xs shrink-0">
                             {getTransporterRating(t.shipmentsCount || 0)}
                           </span>
                         </div>
-                        <p className="text-xs text-slate-600 mt-1.5 font-mono">
+                        <p className="text-xs text-slate-600 mt-1.5 font-mono break-all">
                           {t.phone || '0300-1112223'} &middot; <span className="text-orange-700 font-sans font-semibold">{t.email}</span>
                         </p>
 
@@ -1636,8 +1636,8 @@ export default function BusinessDashboard() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-4 shrink-0 self-end md:self-center relative z-10">
-                      <span className="text-sm text-slate-600 font-bold mr-2 font-mono">
+                    <div className="flex items-center justify-between md:justify-end gap-3 sm:gap-4 w-full md:w-auto shrink-0 relative z-10 pt-2 md:pt-0 border-t border-slate-200/70 md:border-t-0">
+                      <span className="text-xs sm:text-sm text-slate-600 font-bold font-mono">
                         {t.shipmentsCount || 0} shipments
                       </span>
                       <button
@@ -1645,7 +1645,7 @@ export default function BusinessDashboard() {
                           setSelectedTransporter(t);
                           setActiveTab('new-request');
                         }}
-                        className="btn-primary px-4 py-2 text-xs shadow-sm transition-all"
+                        className="btn-primary px-4 py-2 text-xs shadow-sm transition-all shrink-0 whitespace-nowrap"
                       >
                         Send Request
                       </button>
@@ -1664,11 +1664,11 @@ export default function BusinessDashboard() {
           {/* HISTORY TAB */}
           {activeTab === 'history' && (
             <div className="space-y-6">
-              <div className="bg-white border border-slate-200 rounded-2xl p-6 text-left shadow-xs relative overflow-hidden">
+              <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 text-left shadow-xs relative overflow-hidden">
                 <SindhiTruckTexture />
-                <div className="flex justify-between items-center mb-6 relative z-10">
+                <div className="flex flex-wrap justify-between items-center gap-2 mb-5 sm:mb-6 relative z-10">
                   <h3 className="text-xs font-bold text-slate-700 tracking-wider uppercase">Delivery History</h3>
-                  <span className="text-xs font-mono font-bold text-orange-700 bg-orange-50 px-2.5 py-1 rounded-lg border border-orange-200">
+                  <span className="text-xs font-mono font-bold text-orange-700 bg-orange-50 px-2.5 py-1 rounded-lg border border-orange-200 shrink-0">
                     Total Completed: {cargoList.filter(c => c.status === 'Completed').length}
                   </span>
                 </div>

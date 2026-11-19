@@ -69,6 +69,7 @@
   #root {
     width: 100%;
     max-width: 100%;
+    min-width: 0;
     min-height: 100vh;
     min-height: 100dvh;
     display: flex;
@@ -92,25 +93,27 @@
 
 @layer utilities {
 
-  /* 3D Perspective & Z-Depth Layers */
-  .perspective-1200 {
-    perspective: 1200px;
-  }
+  /* 3D Perspective & Z-Depth Layers (hover/pointer desktop only — prevents Android WebView form/IME compositing glitches) */
+  @media (hover: hover) and (pointer: fine) {
+    .perspective-1200 {
+      perspective: 1200px;
+    }
 
-  .preserve-3d {
-    transform-style: preserve-3d;
-  }
+    .preserve-3d {
+      transform-style: preserve-3d;
+    }
 
-  .depth-z-sm {
-    transform: translateZ(12px);
-  }
+    .depth-z-sm {
+      transform: translateZ(12px);
+    }
 
-  .depth-z-md {
-    transform: translateZ(22px);
-  }
+    .depth-z-md {
+      transform: translateZ(22px);
+    }
 
-  .depth-z-lg {
-    transform: translateZ(34px);
+    .depth-z-lg {
+      transform: translateZ(34px);
+    }
   }
 
   /* Sleek obsidian surfaces (GPU-composited without full-screen blur overdraw) */
@@ -407,6 +410,22 @@
    High-contrast crisp surfaces without stacked backdrop-filter GPU stalls
    ========================================================================== */
 
+/* Lock dashboard wrappers inside <main> flex column across all phone widths */
+.dash-dark-theme {
+  width: 100%;
+  min-width: 0;
+}
+
+.dash-dark-theme > *,
+.dash-dark-theme fieldset,
+.dash-dark-theme .grid > * {
+  min-width: 0;
+}
+
+.dash-dark-theme .overflow-x-auto {
+  max-width: 100%;
+}
+
 .dash-dark-theme .bg-white:not(.preserve-light):not(.btn-primary),
 .dash-dark-theme .bg-white\/95:not(.preserve-light),
 .dash-dark-theme .bg-white\/90:not(.preserve-light),
@@ -683,6 +702,17 @@
   background-color: rgba(15, 25, 48, 0.78) !important;
   color: #F8FAFC !important;
   border-color: rgba(255, 255, 255, 0.16) !important;
+  max-width: 100%;
+}
+
+.dash-dark-theme select option {
+  background-color: #0B1325;
+  color: #F8FAFC;
+}
+
+.dash-dark-theme .btn-primary,
+.dash-dark-theme .btn-outline {
+  max-width: 100%;
 }
 
 .dash-dark-theme input:not([type="checkbox"]):not([type="radio"]):not(.bg-transparent):not(.border-0):focus,
@@ -1228,6 +1258,13 @@ input,
 select,
 textarea {
   touch-action: manipulation;
+}
+
+input,
+select,
+textarea {
+  scroll-margin-top: 5.5rem;
+  scroll-margin-bottom: 1.5rem;
 }
 
 @media (max-width: 640px) {

@@ -325,7 +325,7 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="dash-dark-theme max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-5 sm:py-8 relative page-enter">
+    <div className="dash-dark-theme w-full min-w-0 max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-5 sm:py-8 relative page-enter">
       {/* Truck Poetry Banner */}
       <div className="mb-6 relative z-10">
         <TruckPoetryBanner />
@@ -334,7 +334,7 @@ export default function AdminDashboard() {
       {/* Command Header Panel */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6 relative z-10 rounded-2xl sm:rounded-3xl bg-[#0B1325]/96 border border-white/15 p-4 sm:p-6 shadow-[0_18px_48px_-14px_rgba(0,0,0,0.75)] overflow-hidden">
         <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-[#EA580C] via-[#F89020] to-cyan-400" />
-        <div className="text-left">
+        <div className="text-left min-w-0 w-full">
           <div className="flex items-center gap-2 mb-2 flex-wrap">
             <TruckMorBadge />
             {isUrdu && (
@@ -376,7 +376,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Navigation Tabs (Obsidian Segmented Dock) */}
-      <div className="mb-6 sm:mb-8 relative z-10 overflow-x-auto touch-scroll no-scrollbar">
+      <div className="w-full max-w-full min-w-0 mb-6 sm:mb-8 relative z-10 overflow-x-auto touch-scroll no-scrollbar">
         <nav className="inline-flex min-w-full sm:min-w-0 items-center gap-1.5 p-1.5 rounded-2xl bg-[#0B1325]/96 border border-white/15 shadow-[0_12px_28px_rgba(0,0,0,0.45)]">
           {tabs.map(tab => (
             <button
@@ -621,16 +621,16 @@ export default function AdminDashboard() {
             </div>
 
             {/* Bottom Recent Shipments table */}
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm relative overflow-hidden">
+            <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-sm relative overflow-hidden">
               <div className="relative z-10">
-                <div className="flex justify-between items-center mb-6">
-                  <div className="flex items-center gap-2">
+                <div className="flex flex-wrap justify-between items-center gap-2 mb-5 sm:mb-6">
+                  <div className="flex flex-wrap items-center gap-2">
                     <h3 className="text-xs font-bold text-slate-700 tracking-wider uppercase">Recent Shipments</h3>
                     <span className="text-[10px] font-mono text-orange-700 bg-orange-50 px-2 py-0.5 rounded-full border border-orange-200">Live Stream</span>
                   </div>
                   <button
                     onClick={() => setActiveTab('shipments')}
-                    className="text-xs text-orange-700 hover:text-orange-900 font-bold tracking-wide transition-colors flex items-center gap-1.5 cursor-pointer"
+                    className="text-xs text-orange-700 hover:text-orange-900 font-bold tracking-wide transition-colors flex items-center gap-1.5 cursor-pointer shrink-0"
                   >
                     View All <ArrowRight size={14} />
                   </button>
@@ -730,18 +730,18 @@ export default function AdminDashboard() {
               </div>
 
               {/* Right side detail review pane */}
-              <div className="lg:col-span-7 bg-white border border-slate-200 rounded-2xl p-6 flex flex-col justify-between shadow-sm relative overflow-hidden">
+              <div className="lg:col-span-7 min-w-0 bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 flex flex-col justify-between shadow-sm relative overflow-hidden">
                 {selectedPendingUser ? (
-                  <div className="space-y-6 flex-1 flex flex-col justify-between relative z-10">
+                  <div className="space-y-6 flex-1 flex flex-col justify-between relative z-10 min-w-0">
                     <div>
-                      <div className="flex justify-between items-start border-b border-slate-200 pb-4">
-                        <div className="text-left">
-                          <h3 className="text-xl font-bold text-slate-900">{selectedPendingUser.name}</h3>
+                      <div className="flex flex-wrap justify-between items-start gap-2 border-b border-slate-200 pb-4">
+                        <div className="text-left min-w-0 flex-1">
+                          <h3 className="text-xl font-bold text-slate-900 break-words">{selectedPendingUser.name}</h3>
                           <p className={`text-sm font-semibold capitalize ${getRoleStyle(selectedPendingUser.role)}`}>
                             {selectedPendingUser.role.replace('_', ' ')}
                           </p>
                         </div>
-                        <span className="text-xs text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 font-mono font-bold">
+                        <span className="text-xs text-slate-700 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200 font-mono font-bold shrink-0">
                           USR-{selectedPendingUser.id || (selectedPendingUser._id ? String(selectedPendingUser._id).slice(0, 4) : '')}
                         </span>
                       </div>
@@ -1126,21 +1126,21 @@ export default function AdminDashboard() {
               {complaints.map(c => (
                 <div
                   key={c._id || c.id}
-                  className={`p-6 rounded-2xl border transition-all shadow-sm relative overflow-hidden ${c.status === 'Open'
+                  className={`p-4 sm:p-6 rounded-2xl border transition-all shadow-sm relative overflow-hidden ${c.status === 'Open'
                       ? 'bg-red-50/90 border-red-200'
                       : 'bg-white border-slate-200'
                     }`}
                 >
                   <SindhiTruckTexture />
                   <div className="relative z-10">
-                    <div className="flex justify-between items-start gap-3">
-                      <div className="text-left">
-                        <h4 className="text-lg font-bold text-slate-900">{c.subject}</h4>
+                    <div className="flex flex-wrap justify-between items-start gap-3">
+                      <div className="text-left min-w-0 flex-1">
+                        <h4 className="text-base sm:text-lg font-bold text-slate-900 break-words">{c.subject}</h4>
                         <p className="text-xs text-slate-600 mt-1">
                           By <span className="text-slate-900 font-semibold">{c.userName}</span> ({c.userRole.replace('_', ' ')})
                         </p>
                       </div>
-                      <div className="flex items-center gap-3">
+                      <div className="flex flex-wrap items-center gap-2 shrink-0">
                         <span className={`shrink-0 px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider ${c.status === 'Open' ? 'bg-red-100 text-red-700 border border-red-300' : 'bg-emerald-100 text-emerald-700 border border-emerald-300'
                           }`}>
                           {c.status}
@@ -1148,7 +1148,7 @@ export default function AdminDashboard() {
                         {c.status === 'Open' && (
                           <button
                             onClick={() => handleResolveComplaint(c._id || c.id)}
-                            className="btn-primary px-3 py-1 text-xs flex items-center gap-1 shadow-sm cursor-pointer"
+                            className="btn-primary px-3 py-1.5 text-xs flex items-center gap-1 shadow-sm cursor-pointer shrink-0 whitespace-nowrap"
                           >
                             <Check size={12} /> Resolve Dispute
                           </button>
@@ -1242,7 +1242,7 @@ export default function AdminDashboard() {
         >
           <div
             onClick={e => e.stopPropagation()}
-            className="bg-white/95 border border-slate-200 rounded-2xl shadow-2xl w-full max-w-3xl relative overflow-hidden modal-enter"
+            className="bg-white/95 border border-slate-200 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[calc(100dvh-1.5rem)] overflow-y-auto my-auto relative modal-enter"
           >
             {/* Top Chamak Patti decoration */}
             <ChamakRibbon height="h-1.5" />

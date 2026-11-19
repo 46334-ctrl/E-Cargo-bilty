@@ -21,7 +21,16 @@ import {
   TruckBackground,
   NazarBattuBadge
 } from '../components/TruckArt';
-import { DEFAULT_SERVER_IP, getStoredServerIP, getServerBaseUrl, setStoredServerIP, testServerHealth } from '../api';
+import {
+  DEFAULT_SERVER_IP,
+  getStoredServerIP,
+  getServerBaseUrl,
+  setStoredServerIP,
+  probeServerConnection,
+  isBackendUnreachableError,
+  formatBackendUnreachableMessage,
+  formatProbeStatusMessage
+} from '../api';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -151,14 +160,10 @@ export default function Login() {
       const serverMsg = err.response?.data?.message;
       if (serverMsg) {
         setError(serverMsg);
-      } else if (err.code === 'ERR_NETWORK' || err.message === 'Network Error' || err.message?.includes('Network')) {
+      } else if (isBackendUnreachableError(err)) {
         const activeUrl = getServerBaseUrl();
         setShowIpEditor(true);
-        setError(
-          isUrdu
-            ? `سرور (${activeUrl}) سے رابطہ نہیں ہو سکا۔ برائے مہربانی نیچے نیا آئی پی ایڈریس درج کر کے محفوظ کریں یا Wi-Fi چیک کریں۔`
-            : `Cannot reach backend at ${activeUrl}. Please ensure your device is on the same Wi-Fi or update the Server IP below.`
-        );
+        setError(formatBackendUnreachableMessage(err, activeUrl, isUrdu));
       } else {
         setError(
           err.message ||
@@ -180,22 +185,15 @@ export default function Login() {
     setIpStatus({ message: '', ok: true });
     const newBaseUrl = setStoredServerIP(trimmed);
     setCurrentServerUrl(newBaseUrl);
-    const healthy = await testServerHealth(newBaseUrl);
+    const probe = await probeServerConnection(newBaseUrl);
     setSavingIp(false);
-    if (healthy) {
+    if (probe.ok) {
       setError('');
-      setIpStatus({
-        message: isUrdu ? `رابطہ کامیاب! (${newBaseUrl})` : `Connected to ${newBaseUrl}`,
-        ok: true
-      });
-    } else {
-      setIpStatus({
-        message: isUrdu
-          ? `آئی پی محفوظ ہو گیا، مگر ${newBaseUrl} سے جواب نہیں ملا۔ Wi-Fi چیک کریں۔`
-          : `Saved IP, but cannot reach ${newBaseUrl}. Check Wi-Fi & server.`,
-        ok: false
-      });
     }
+    setIpStatus({
+      message: formatProbeStatusMessage(probe, isUrdu, false),
+      ok: probe.ok
+    });
   };
 
   const handleResetIp = async () => {
@@ -204,13 +202,14 @@ export default function Login() {
     setIpStatus({ message: '', ok: true });
     const newBaseUrl = setStoredServerIP('');
     setCurrentServerUrl(newBaseUrl);
-    const healthy = await testServerHealth(newBaseUrl);
+    const probe = await probeServerConnection(newBaseUrl);
     setSavingIp(false);
+    if (probe.ok) {
+      setError('');
+    }
     setIpStatus({
-      message: healthy
-        ? (isUrdu ? `ڈیفالٹ آئی پی پر بحال اور منسلک (${newBaseUrl})` : `Reset to default & connected (${newBaseUrl})`)
-        : (isUrdu ? `ڈیفالٹ آئی پی پر بحال: ${newBaseUrl}` : `Reset to default: ${newBaseUrl}`),
-      ok: healthy
+      message: formatProbeStatusMessage(probe, isUrdu, true),
+      ok: probe.ok
     });
   };
 
@@ -267,7 +266,7 @@ export default function Login() {
       </div>
 
       {/* Centered 3D Login Stage */}
-      <div className="flex-1 flex flex-col items-center justify-center min-h-[calc(100dvh-4.5rem)] py-6 sm:py-9 px-3.5 sm:px-4 relative z-10 perspective-1200">
+      <div className="flex-1 flex flex-col items-center py-4 sm:py-9 px-3 sm:px-4 relative z-10 perspective-1200">
         <div className="w-full max-w-[440px] sm:max-w-[460px] z-10 my-auto page-enter preserve-3d">
           <Tilt3DCard
             maxTilt={3.2}
@@ -285,7 +284,7 @@ export default function Login() {
                 <div className="h-1.5 w-full bg-gradient-to-r from-[#EA580C] via-[#F89020] to-cyan-400" />
               </div>
 
-              <div className="p-5 sm:p-7 pt-6 sm:pt-8 relative z-10 preserve-3d">
+              <div className="p-4 sm:p-7 pt-5 sm:pt-8 relative z-10 preserve-3d">
                 {/* Branded 3D Header */}
                 <div className="text-center mb-5 preserve-3d">
                   <div className="flex justify-center mb-3 depth-z-md">
@@ -477,7 +476,7 @@ export default function Login() {
                   </div>
 
                   {showIpEditor && (
-                    <div className="flex items-center gap-1.5 max-w-xs mx-auto modal-enter">
+                    <div className="flex flex-wrap sm:flex-nowrap items-center justify-center gap-1.5 max-w-xs mx-auto modal-enter">
                       <input
                         type="text"
                         dir="ltr"

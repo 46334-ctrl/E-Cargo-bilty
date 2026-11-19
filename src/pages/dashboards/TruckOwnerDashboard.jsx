@@ -588,11 +588,11 @@ export default function TruckOwnerDashboard() {
   };
 
   return (
-    <div className="dash-dark-theme max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-5 sm:py-8 relative page-enter">
+    <div className="dash-dark-theme w-full min-w-0 max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-5 sm:py-8 relative page-enter">
       {/* Command Header Panel */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6 relative z-10 rounded-2xl sm:rounded-3xl bg-[#0B1325]/96 border border-white/15 p-4 sm:p-6 shadow-[0_18px_48px_-14px_rgba(0,0,0,0.75)] overflow-hidden">
         <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-[#EA580C] via-[#F89020] to-cyan-400" />
-        <div className="text-left">
+        <div className="text-left min-w-0 w-full">
           <div className="flex items-center gap-2 mb-2 flex-wrap">
             <span className="text-xs font-bold uppercase tracking-wider text-orange-300 bg-orange-500/15 px-2.5 py-0.5 rounded-full border border-orange-400/35">
               {isUrdu ? 'فلیٹ کنٹرول' : 'Fleet Operations'}
@@ -662,7 +662,7 @@ export default function TruckOwnerDashboard() {
       )}
 
       {/* Dashboard Tabs (Obsidian Segmented Dock) */}
-      <div className="mb-6 sm:mb-8 relative z-10 overflow-x-auto touch-scroll no-scrollbar">
+      <div className="w-full max-w-full min-w-0 mb-6 sm:mb-8 relative z-10 overflow-x-auto touch-scroll no-scrollbar">
         <nav className="inline-flex min-w-full sm:min-w-0 items-center gap-1.5 p-1.5 rounded-2xl bg-[#0B1325]/96 border border-white/15 shadow-[0_12px_28px_rgba(0,0,0,0.45)]">
           {[
             { id: 'fleet', name: 'Fleet Inventory' },
@@ -702,31 +702,31 @@ export default function TruckOwnerDashboard() {
           {/* FLEETS PANEL */}
           {activeTab === 'fleet' && (
             <div className="space-y-6">
-              <div className="flex justify-between items-center bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
-                <div className="flex items-center gap-3">
+              <div className="flex flex-wrap justify-between items-center gap-3 bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-sm">
+                <div className="flex items-center gap-3 min-w-0">
 
-                  <span className="text-sm text-slate-800 font-bold font-mono">
+                  <span className="text-xs sm:text-sm text-slate-800 font-bold font-mono">
                     {trucks.filter(t => t.status === 'Available').length} available / {trucks.length} registered trucks
                   </span>
                 </div>
                 <button
                   onClick={() => setShowAddModal(true)}
-                  className="btn-primary text-xs !py-2 !px-4 shadow-sm transition-all"
+                  className="btn-primary text-xs !py-2 !px-3.5 sm:!px-4 shadow-sm transition-all shrink-0 whitespace-nowrap"
                 >
                   <Plus size={16} /> {isUrdu ? 'گاڑی شامل کریں' : 'Register Truck'}
                 </button>
               </div>
 
               {/* Live Fleet Radar Map */}
-              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm text-left">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
+              <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-sm text-left overflow-hidden">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                  <div className="flex items-center gap-2 min-w-0">
 
                     <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider font-mono">
                       {isUrdu ? 'لائیو فلیٹ راڈار اور ٹرمینل ڈپوز' : 'Live Fleet Radar & Depot Terminals'}
                     </h3>
                   </div>
-                  <span className="text-[11px] font-mono font-bold text-slate-500">
+                  <span className="text-[11px] font-mono font-bold text-slate-500 shrink-0">
                     {trucks.length} Units Active
                   </span>
                 </div>
@@ -736,17 +736,17 @@ export default function TruckOwnerDashboard() {
               {/* Trucks list */}
               <div className="space-y-4">
                 {trucks.map(truck => (
-                  <div key={truck._id} className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-200 relative overflow-hidden group">
+                  <div key={truck._id} className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 shadow-sm hover:shadow-md transition-all duration-200 relative overflow-hidden group">
 
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                      <div className="flex items-start gap-4">
-                        <div className="w-12 h-12 rounded-xl bg-orange-50 border border-orange-200 text-orange-700 flex items-center justify-center shrink-0 shadow-2xs">
-                          <Truck size={24} />
+                      <div className="flex items-start gap-3 sm:gap-4 min-w-0 flex-1">
+                        <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-orange-50 border border-orange-200 text-orange-700 flex items-center justify-center shrink-0 shadow-2xs">
+                          <Truck size={22} />
                         </div>
-                        <div className="text-left">
-                          <div className="flex items-center gap-2.5">
-                            <h4 className="text-2xl font-bold text-slate-900 tracking-wide font-mono">{truck.plateNumber}</h4>
-                            <span className="text-xs text-orange-800 bg-orange-50 px-2.5 py-0.5 rounded-lg border border-orange-200 font-mono font-bold">
+                        <div className="text-left min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h4 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-wide font-mono">{truck.plateNumber}</h4>
+                            <span className="text-xs text-orange-800 bg-orange-50 px-2.5 py-0.5 rounded-lg border border-orange-200 font-mono font-bold max-w-full break-words">
                               {truck.truckType} &middot; {truck.capacity}
                             </span>
                           </div>
@@ -888,11 +888,11 @@ export default function TruckOwnerDashboard() {
                 </div>
 
                 {/* Right assignment preview */}
-                <div className="lg:col-span-7 bg-white border border-slate-200 rounded-2xl p-6 flex flex-col justify-between shadow-xs">
+                <div className="lg:col-span-7 min-w-0 bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 flex flex-col justify-between shadow-xs">
                   {selectedBooking ? (
-                    <div className="flex flex-col justify-between flex-1 text-left space-y-6">
+                    <div className="flex flex-col justify-between flex-1 text-left space-y-6 min-w-0">
                       <div>
-                        <div className="flex justify-between items-start border-b border-slate-200 pb-4 gap-2">
+                        <div className="flex flex-wrap justify-between items-start border-b border-slate-200 pb-4 gap-2">
                           <div className="min-w-0 flex-1 pr-2">
                             <div className="flex items-center gap-2 mb-1">
                               <span className="text-[10px] font-bold text-orange-700 uppercase tracking-wider">Assignment Details</span>
@@ -952,7 +952,7 @@ export default function TruckOwnerDashboard() {
                       {/* Progress action controls */}
                       <div className="border-t border-slate-200 pt-6 space-y-4">
                         {selectedBooking.status === 'Pending' ? (
-                          <div className="flex gap-3">
+                          <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3">
                             <button
                               onClick={() => handleBookingResponse(selectedBooking._id || selectedBooking.id, true)}
                               className="flex-1 btn-primary text-white font-bold py-3 rounded-xl text-sm shadow-xs"
@@ -968,17 +968,17 @@ export default function TruckOwnerDashboard() {
                           </div>
                         ) : (
                           <div className="space-y-4">
-                            <div className="flex gap-2">
+                            <div className="flex flex-wrap sm:flex-nowrap gap-2 min-w-0">
                               <input
                                 type="text"
                                 value={eta}
                                 onChange={e => setEta(e.target.value)}
                                 placeholder="Update ETA (e.g. 1.5 days or 5 hrs)"
-                                className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-900 text-xs outline-none focus:bg-white focus:border-orange-500 font-mono"
+                                className="flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-900 text-xs outline-none focus:bg-white focus:border-orange-500 font-mono"
                               />
                               <button
                                 onClick={() => handleUpdateEta(selectedBooking._id || selectedBooking.id)}
-                                className="btn-outline px-4 py-2 rounded-xl text-xs font-bold"
+                                className="btn-outline px-4 py-2 rounded-xl text-xs font-bold shrink-0 whitespace-nowrap"
                               >
                                 Set ETA
                               </button>
@@ -1206,17 +1206,17 @@ export default function TruckOwnerDashboard() {
                     </div>
 
                     {/* Message submit form */}
-                    <form onSubmit={handleSendMessage} className="flex gap-2 border-t border-slate-200 pt-3">
+                    <form onSubmit={handleSendMessage} className="flex gap-2 border-t border-slate-200 pt-3 min-w-0">
                       <input
                         type="text"
                         value={chatMessageText}
                         onChange={(e) => setChatMessageText(e.target.value)}
                         placeholder="Type fleet message..."
-                        className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 outline-none focus:bg-white focus:border-orange-500"
+                        className="flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-xl px-3.5 sm:px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 outline-none focus:bg-white focus:border-orange-500"
                       />
                       <button
                         type="submit"
-                        className="btn-primary p-3 rounded-xl cursor-pointer flex items-center justify-center shadow-xs"
+                        className="btn-primary p-3 rounded-xl cursor-pointer flex items-center justify-center shadow-xs shrink-0"
                       >
                         <Send size={16} />
                       </button>

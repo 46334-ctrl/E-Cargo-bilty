@@ -22,7 +22,21 @@ const {
 
 
 const app = express();
-app.use(cors({ origin: '*' }));
+
+// Allow Chromium Private Network Access (http://localhost WebView -> LAN IP) alongside CORS
+app.use((req, res, next) => {
+  res.setHeader('Access-Control-Allow-Private-Network', 'true');
+  if (req.path === '/api/health' || req.path.startsWith('/api/auth/')) {
+    console.log(`[API] ${req.method} ${req.originalUrl} from ${req.ip}`);
+  }
+  next();
+});
+
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization']
+}));
 app.use(express.json());
 
 // Lightweight health check endpoint for mobile IP verification

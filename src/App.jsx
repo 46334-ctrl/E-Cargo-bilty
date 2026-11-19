@@ -814,7 +814,7 @@ const Home = () => {
   ];
 
   return (
-    <div ref={heroParallaxRef} className="w-full overflow-x-clip flex flex-col text-white relative">
+    <div ref={heroParallaxRef} className="w-full min-w-0 overflow-x-clip flex flex-col text-white relative">
       {/* Single unified 60/120fps GPU highway backdrop shared cleanly across landing page */}
       <HighwayBackdrop variant="hero" fixed />
 
@@ -1206,6 +1206,56 @@ function AndroidBackButtonHandler() {
   const location = useLocation();
 
   useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    let focusTimer = 0;
+    const isEditableField = (el) => {
+      if (!el) return false;
+      const tag = el.tagName;
+      if (tag === 'TEXTAREA' || tag === 'SELECT') return true;
+      if (tag !== 'INPUT') return false;
+      const t = (el.type || 'text').toLowerCase();
+      return !['checkbox', 'radio', 'file', 'submit', 'button', 'reset', 'hidden'].includes(t);
+    };
+
+    const scrollActiveField = () => {
+      if (typeof window === 'undefined') return;
+      const isMobileOrNative = Boolean(window.Capacitor) || window.innerWidth < 1024;
+      if (!isMobileOrNative) return;
+      const active = document.activeElement;
+      if (!isEditableField(active)) return;
+      try {
+        active.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+      } catch {
+        active.scrollIntoView(false);
+      }
+    };
+
+    const handleFocusIn = (e) => {
+      if (!isEditableField(e.target)) return;
+      if (focusTimer) window.clearTimeout(focusTimer);
+      focusTimer = window.setTimeout(scrollActiveField, 280);
+    };
+
+    const vv = typeof window !== 'undefined' ? window.visualViewport : null;
+    const handleViewportResize = () => {
+      if (focusTimer) window.clearTimeout(focusTimer);
+      focusTimer = window.setTimeout(scrollActiveField, 80);
+    };
+
+    document.addEventListener('focusin', handleFocusIn, { passive: true });
+    vv?.addEventListener('resize', handleViewportResize);
+
+    return () => {
+      if (focusTimer) window.clearTimeout(focusTimer);
+      document.removeEventListener('focusin', handleFocusIn);
+      vv?.removeEventListener('resize', handleViewportResize);
+    };
+  }, []);
+
+  useEffect(() => {
     let handle;
 
     const setupListener = async () => {
@@ -1245,7 +1295,7 @@ function App() {
       <LanguageProvider>
         <ToastProvider>
           <AuthProvider>
-            <div className="min-h-[100dvh] flex flex-col bg-[#060B16] text-slate-100 relative">
+            <div className="min-h-[100dvh] w-full max-w-full min-w-0 flex flex-col bg-[#060B16] text-slate-100 relative">
               {/* Subtle persistent ambient obsidian command aura (pre-feathered radial gradients, zero blur FBOs) */}
               <div
                 aria-hidden="true"
@@ -1258,7 +1308,7 @@ function App() {
                 }}
               />
               <Navbar />
-              <main className="flex-1 flex flex-col relative z-10">
+              <main className="flex-1 w-full max-w-full min-w-0 flex flex-col relative z-10">
                 <Routes>
                   <Route path="/" element={<Home />} />
                   <Route path="/login" element={<Login />} />

@@ -358,7 +358,7 @@ export default function TransporterDashboard() {
   const pendingRequests = cargoRequests.filter(c => c.status === 'Pending');
 
   return (
-    <div className="dash-dark-theme max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-5 sm:py-8 relative page-enter">
+    <div className="dash-dark-theme w-full min-w-0 max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-5 sm:py-8 relative page-enter">
       {/* Truck Poetry Banner */}
       <div className="mb-6 relative z-10">
         <TruckPoetryBanner />
@@ -367,7 +367,7 @@ export default function TransporterDashboard() {
       {/* Command Header Panel */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6 relative z-10 rounded-2xl sm:rounded-3xl bg-[#0B1325]/96 border border-white/15 p-4 sm:p-6 shadow-[0_18px_48px_-14px_rgba(0,0,0,0.75)] overflow-hidden">
         <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-[#EA580C] via-[#F89020] to-cyan-400" />
-        <div className="text-left">
+        <div className="text-left min-w-0 w-full">
           <div className="flex items-center gap-2 mb-2 flex-wrap">
             <TruckMorBadge />
             <span className="text-[11px] font-bold uppercase tracking-wider text-orange-300 bg-orange-500/15 px-2.5 py-0.5 rounded-full border border-orange-400/35">Fleet Operations</span>
@@ -387,7 +387,7 @@ export default function TransporterDashboard() {
       </div>
 
       {/* Tabs navigation (Obsidian Segmented Dock) */}
-      <div className="mb-6 sm:mb-8 relative z-10 overflow-x-auto touch-scroll no-scrollbar">
+      <div className="w-full max-w-full min-w-0 mb-6 sm:mb-8 relative z-10 overflow-x-auto touch-scroll no-scrollbar">
         <nav className="inline-flex min-w-full sm:min-w-0 items-center gap-1.5 p-1.5 rounded-2xl bg-[#0B1325]/96 border border-white/15 shadow-[0_12px_28px_rgba(0,0,0,0.45)]">
           {[
             { id: 'requests', name: isUrdu ? 'نئی کارگو درخواستیں' : 'Incoming Requests', badge: pendingRequests.length },
@@ -432,8 +432,8 @@ export default function TransporterDashboard() {
               const reqRecipients = Array.isArray(req.recipients) ? req.recipients : safeJsonParse(req.recipients, []);
 
               return (
-              <div key={req._id || req.id} className="bg-white border border-slate-200 shadow-sm rounded-2xl p-6 space-y-4">
-                <div className="flex justify-between items-center border-b border-slate-200 pb-3">
+              <div key={req._id || req.id} className="bg-white border border-slate-200 shadow-sm rounded-2xl p-4 sm:p-6 space-y-4">
+                <div className="flex flex-wrap justify-between items-center gap-2 border-b border-slate-200 pb-3">
                   <div>
                     <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                       <TruckTaj className="text-orange-600 w-4 h-3" />
@@ -491,16 +491,16 @@ export default function TransporterDashboard() {
                         const tax = reqTariff.taxAmount || reqTariff.salesTax || 0;
                         const base = reqTariff.baseFreight || reqTariff.baseFare || 0;
                         return (
-                          <div className="bg-emerald-50 border border-emerald-300 p-2.5 rounded-xl text-left mt-2 flex items-center justify-between shadow-xs">
-                            <div>
+                          <div className="bg-emerald-50 border border-emerald-300 p-2.5 rounded-xl text-left mt-2 flex flex-wrap items-center justify-between gap-2 shadow-xs">
+                            <div className="min-w-0">
                               <p className="text-[9px] font-black text-emerald-800 uppercase tracking-wider">
                                 Calculated Tariff ({reqTariff.distanceKm || 0} km)
                               </p>
-                              <p className="text-[10px] text-slate-500 font-mono mt-0.5">
+                              <p className="text-[10px] text-slate-500 font-mono mt-0.5 break-words">
                                 Base: Rs. {base.toLocaleString()} &bull; Tax: Rs. {tax.toLocaleString()}
                               </p>
                             </div>
-                            <span className="text-xs font-black text-emerald-700 font-mono">
+                            <span className="text-xs font-black text-emerald-700 font-mono shrink-0">
                               Rs. {total.toLocaleString()}
                             </span>
                           </div>
@@ -537,7 +537,7 @@ export default function TransporterDashboard() {
                 </div>
 
                 {/* Accept/Reject triggers */}
-                <div className="flex gap-4 pt-2">
+                <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-4 pt-2">
                   <button 
                     onClick={() => handleCargoResponse(req._id || req.id, 'Accepted')}
                     className="flex-1 btn-primary text-sm font-bold py-2.5 rounded-xl cursor-pointer flex items-center justify-center gap-2 shadow-md"
@@ -730,25 +730,25 @@ export default function TransporterDashboard() {
               /* Grid Cards View */
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {availableTrucks.map(truck => (
-                  <div key={truck._id} className="bg-white border border-slate-200 rounded-2xl p-5 text-left flex flex-col justify-between h-[290px] shadow-xs hover:border-orange-300 hover:shadow-md transition-all duration-300 relative overflow-hidden group">
+                  <div key={truck._id} className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 text-left flex flex-col justify-between min-h-[260px] h-full shadow-xs hover:border-orange-300 hover:shadow-md transition-all duration-300 relative overflow-hidden group">
                     <div>
-                      <div className="flex justify-between items-start">
-                        <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-200 text-orange-700 flex items-center justify-center group-hover:scale-105 transition-transform shadow-2xs">
+                      <div className="flex justify-between items-start gap-2">
+                        <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-200 text-orange-700 flex items-center justify-center group-hover:scale-105 transition-transform shadow-2xs shrink-0">
                           <Truck size={20} />
                         </div>
-                        <span className="bg-emerald-50 text-emerald-800 border border-emerald-300 text-[10px] font-bold tracking-wider uppercase px-2.5 py-0.5 rounded-md font-mono shadow-2xs">
+                        <span className="bg-emerald-50 text-emerald-800 border border-emerald-300 text-[10px] font-bold tracking-wider uppercase px-2.5 py-0.5 rounded-md font-mono shadow-2xs shrink-0">
                           Available
                         </span>
                       </div>
 
-                      <h4 className="text-xl font-bold text-slate-900 mt-4 font-mono">{truck.plateNumber}</h4>
+                      <h4 className="text-xl font-bold text-slate-900 mt-4 font-mono break-words">{truck.plateNumber}</h4>
                       <p className="text-xs text-orange-700 font-semibold mt-1">{truck.truckType} &middot; {truck.capacity}</p>
 
                       <div className="mt-4 space-y-1 text-xs text-slate-700">
                         <p><span className="text-slate-500">Owner:</span> <span className="text-slate-900 font-bold">{truck.ownerName}</span></p>
                         <p><span className="text-slate-500">Driver:</span> <span className="text-slate-900 font-bold">{truck.driverName}</span> <span className="text-slate-500 font-mono">({truck.driverMobile})</span></p>
                         <p className="flex items-center gap-1 mt-2 text-slate-600 font-medium">
-                          <MapPin size={12} className="text-slate-500" /> {truck.loc}
+                          <MapPin size={12} className="text-slate-500 shrink-0" /> {truck.loc}
                         </p>
                       </div>
                     </div>
@@ -762,7 +762,7 @@ export default function TransporterDashboard() {
                   </div>
                 ))}
                 {availableTrucks.length === 0 && (
-                  <div className="col-span-3 bg-white border border-slate-200 rounded-2xl text-center py-16 text-slate-600 shadow-xs">
+                  <div className="col-span-full bg-white border border-slate-200 rounded-2xl text-center py-16 px-4 text-slate-600 shadow-xs">
                     No available trucks found. Register or clear trips to free vehicles.
                   </div>
                 )}
@@ -820,11 +820,11 @@ export default function TransporterDashboard() {
               <div className="lg:col-span-8 grid grid-cols-1 md:grid-cols-12 gap-6">
                 
                 {/* Details card */}
-                <div className="md:col-span-7 bg-white border border-slate-200 rounded-2xl p-6 flex flex-col justify-between text-left shadow-xs">
+                <div className="md:col-span-7 min-w-0 bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 flex flex-col justify-between text-left shadow-xs">
                   {selectedBooking ? (
-                    <div className="space-y-6 flex-1 flex flex-col justify-between">
+                    <div className="space-y-6 flex-1 flex flex-col justify-between min-w-0">
                       <div>
-                        <div className="flex justify-between items-start border-b border-slate-200 pb-4 gap-2">
+                        <div className="flex flex-wrap justify-between items-start border-b border-slate-200 pb-4 gap-2">
                           <div className="min-w-0 flex-1 pr-2">
                             <h3 className="text-lg font-bold text-slate-900 break-words">{selectedBooking.cargoTitle}</h3>
                             <p className="text-xs text-slate-500 mt-1">
@@ -931,17 +931,17 @@ export default function TransporterDashboard() {
                       </div>
 
                       {/* Chat text input submit */}
-                      <form onSubmit={handleSendMessage} className="flex gap-2 border-t border-slate-200 pt-3">
+                      <form onSubmit={handleSendMessage} className="flex gap-2 border-t border-slate-200 pt-3 min-w-0">
                         <input 
                           type="text" 
                           value={chatMessageText}
                           onChange={e => setChatMessageText(e.target.value)}
                           placeholder="Type dispatch message..."
-                          className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 placeholder-slate-400 outline-none focus:bg-white focus:border-orange-500"
+                          className="flex-1 min-w-0 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-900 placeholder-slate-400 outline-none focus:bg-white focus:border-orange-500"
                         />
                         <button 
                           type="submit"
-                          className="btn-primary p-2.5 rounded-xl cursor-pointer flex items-center justify-center shadow-xs"
+                          className="btn-primary p-2.5 rounded-xl cursor-pointer flex items-center justify-center shadow-xs shrink-0"
                         >
                           <Send size={14} />
                         </button>
@@ -963,10 +963,10 @@ export default function TransporterDashboard() {
         {/* HISTORY TAB */}
         {activeTab === 'history' && (
           <div className="space-y-6">
-            <div className="bg-white border border-slate-200 rounded-2xl p-6 text-left shadow-xs">
-              <div className="flex justify-between items-center mb-6">
+            <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-6 text-left shadow-xs">
+              <div className="flex flex-wrap justify-between items-center gap-2 mb-5 sm:mb-6">
                 <h3 className="text-xs font-bold text-slate-700 tracking-wider uppercase">Delivery History</h3>
-                <span className="text-xs font-mono font-bold text-orange-700 bg-orange-50 px-2.5 py-1 rounded-lg border border-orange-200">
+                <span className="text-xs font-mono font-bold text-orange-700 bg-orange-50 px-2.5 py-1 rounded-lg border border-orange-200 shrink-0">
                   Completed Trips: {bookings.filter(b => b.status === 'Completed').length}
                 </span>
               </div>
