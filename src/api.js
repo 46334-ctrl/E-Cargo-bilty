@@ -4,6 +4,34 @@ import { io } from 'socket.io-client';
 export const DEFAULT_SERVER_IP = '192.168.18.93';
 export const DEFAULT_SERVER_PORT = '5000';
 
+export const normalizeServerUrl = (rawInput) => {
+  if (!rawInput || typeof rawInput !== 'string') return '';
+  let trimmed = rawInput.trim().replace(/\/+$/, '');
+  if (!trimmed) return '';
+
+  // If already starts with http:// or https://
+  if (/^https?:\/\//i.test(trimmed)) {
+    // If user mistakenly appended :5000 to a cloud domain (like *.railway.app:5000), strip it
+    if (/railway\.app:5000$/i.test(trimmed)) {
+      return trimmed.replace(/:5000$/, '');
+    }
+    return trimmed;
+  }
+
+  // If it contains a custom port like 192.168.1.1:5000 or localhost:8080
+  if (trimmed.includes(':')) {
+    return `http://${trimmed}`;
+  }
+
+  // If it is a cloud/domain name like "e-cargo-bilty-production.up.railway.app" or any domain with letters
+  if (/[a-zA-Z]/.test(trimmed) && trimmed.includes('.')) {
+    return `https://${trimmed}`;
+  }
+
+  // Pure IP address (like 192.168.18.93 or 10.0.0.5) for local LAN development
+  return `http://${trimmed}:${DEFAULT_SERVER_PORT}`;
+};
+
 export const getStoredServerIP = () => {
   if (typeof window !== 'undefined') {
     const custom = localStorage.getItem('custom_server_ip');
@@ -21,33 +49,32 @@ export const getServerBaseUrl = () => {
   }
 
   if (typeof window !== 'undefined' && window.location) {
+    // When running directly on live production web (e.g. Railway or HTTPS)
+    const isLiveProductionWeb =
+      window.location.protocol === 'https:' ||
+      (window.location.hostname &&
+        window.location.hostname !== 'localhost' &&
+        window.location.hostname !== '127.0.0.1' &&
+        !/^\d+\.\d+\.\d+\.\d+$/.test(window.location.hostname));
+
     const custom = localStorage.getItem('custom_server_ip');
     if (custom && custom.trim()) {
-      const trimmed = custom.trim();
-      if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed.replace(/\/+$/, '');
-      if (trimmed.includes(':')) return `http://${trimmed}`;
-      return `http://${trimmed}:${DEFAULT_SERVER_PORT}`;
-    }
-
-    // Live hosted web domain (HTTPS like Railway, custom domain, or production port)
-    if (window.location.protocol === 'https:') {
-      return window.location.origin;
-    }
-    if (window.location.hostname && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-      if (!window.location.hostname.match(/^\d+\.\d+\.\d+\.\d+$/)) {
+      const normalized = normalizeServerUrl(custom);
+      // If we are on live web and the custom setting was just an old local LAN IP, clear it!
+      if (isLiveProductionWeb && !custom.includes(window.location.hostname) && /192\.168\.|127\.0\.0\.1|localhost/.test(normalized)) {
+        localStorage.removeItem('custom_server_ip');
         return window.location.origin;
       }
+      return normalized;
+    }
+
+    if (isLiveProductionWeb) {
+      return window.location.origin;
     }
   }
 
   const ipOrHost = getStoredServerIP();
-  if (ipOrHost.startsWith('http://') || ipOrHost.startsWith('https://')) {
-    return ipOrHost.replace(/\/+$/, '');
-  }
-  if (ipOrHost.includes(':')) {
-    return `http://${ipOrHost}`;
-  }
-  return `http://${ipOrHost}:${DEFAULT_SERVER_PORT}`;
+  return normalizeServerUrl(ipOrHost);
 };
 
 export const getApiUrl = () => `${getServerBaseUrl()}/api`;
@@ -179,7 +206,7 @@ export const setStoredServerIP = (newIp) => {
   if (!newIp || !newIp.trim()) {
     localStorage.removeItem('custom_server_ip');
   } else {
-    let clean = newIp.trim().replace(/^https?:\/\//i, '').replace(/\/.*$/, '');
+    let clean = newIp.trim().replace(/\/+$/, '');
     localStorage.setItem('custom_server_ip', clean);
   }
   api.defaults.baseURL = getApiUrl();
