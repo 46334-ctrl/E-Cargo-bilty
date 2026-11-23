@@ -3,11 +3,14 @@
   "appName": "E-CARGO-BILTY",
   "webDir": "dist",
   "server": {
-    "androidScheme": "http",
+    "androidScheme": "https",
     "cleartext": true,
     "allowNavigation": [
+      "*.up.railway.app",
+      "e-cargo-bilty-production.up.railway.app",
       "192.168.18.93:5000",
-      "192.168.18.93"
+      "192.168.18.93",
+      "localhost"
     ]
   },
   "plugins": {

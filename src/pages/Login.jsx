@@ -21,6 +21,7 @@ import {
 } from '../components/TruckArt';
 import {
   DEFAULT_SERVER_IP,
+  getDefaultServerTarget,
   getStoredServerIP,
   getServerBaseUrl,
   setStoredServerIP,
@@ -195,7 +196,7 @@ export default function Login() {
   };
 
   const handleResetIp = async () => {
-    setServerIpInput(DEFAULT_SERVER_IP);
+    setServerIpInput(getDefaultServerTarget());
     setSavingIp(true);
     setIpStatus({ message: '', ok: true });
     const newBaseUrl = setStoredServerIP('');

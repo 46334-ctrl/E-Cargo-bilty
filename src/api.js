@@ -1,8 +1,14 @@
 import axios from 'axios';
 import { io } from 'socket.io-client';
+import { Capacitor } from '@capacitor/core';
 
+export const PRODUCTION_SERVER_URL = 'https://e-cargo-bilty-production.up.railway.app';
 export const DEFAULT_SERVER_IP = '192.168.18.93';
 export const DEFAULT_SERVER_PORT = '5000';
+
+export const getDefaultServerTarget = () => {
+  return Capacitor.isNativePlatform() ? PRODUCTION_SERVER_URL : DEFAULT_SERVER_IP;
+};
 
 export const normalizeServerUrl = (rawInput) => {
   if (!rawInput || typeof rawInput !== 'string') return '';
@@ -35,17 +41,40 @@ export const normalizeServerUrl = (rawInput) => {
 export const getStoredServerIP = () => {
   if (typeof window !== 'undefined') {
     const custom = localStorage.getItem('custom_server_ip');
-    if (custom && custom.trim()) return custom.trim();
+    if (custom && custom.trim()) {
+      // Auto-migrate native mobile app from old hardcoded local LAN IP to Railway
+      if (Capacitor.isNativePlatform() && (custom === '192.168.18.93' || custom === DEFAULT_SERVER_IP)) {
+        localStorage.removeItem('custom_server_ip');
+        return PRODUCTION_SERVER_URL;
+      }
+      return custom.trim();
+    }
+    if (Capacitor.isNativePlatform()) {
+      return PRODUCTION_SERVER_URL;
+    }
     if (window.location?.hostname && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
       return window.location.hostname;
     }
   }
-  return DEFAULT_SERVER_IP;
+  return Capacitor.isNativePlatform() ? PRODUCTION_SERVER_URL : DEFAULT_SERVER_IP;
 };
 
 export const getServerBaseUrl = () => {
   if (import.meta.env?.VITE_API_URL) {
     return import.meta.env.VITE_API_URL.replace(/\/+$/, '');
+  }
+
+  // Capacitor native mobile platform (Android APK / iOS)
+  if (Capacitor.isNativePlatform()) {
+    const custom = localStorage.getItem('custom_server_ip');
+    if (custom && custom.trim()) {
+      if (custom === '192.168.18.93' || custom === DEFAULT_SERVER_IP) {
+        localStorage.removeItem('custom_server_ip');
+        return PRODUCTION_SERVER_URL;
+      }
+      return normalizeServerUrl(custom);
+    }
+    return PRODUCTION_SERVER_URL;
   }
 
   if (typeof window !== 'undefined' && window.location) {
