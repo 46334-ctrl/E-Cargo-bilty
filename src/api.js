@@ -16,6 +16,30 @@ export const getStoredServerIP = () => {
 };
 
 export const getServerBaseUrl = () => {
+  if (import.meta.env?.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL.replace(/\/+$/, '');
+  }
+
+  if (typeof window !== 'undefined' && window.location) {
+    const custom = localStorage.getItem('custom_server_ip');
+    if (custom && custom.trim()) {
+      const trimmed = custom.trim();
+      if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed.replace(/\/+$/, '');
+      if (trimmed.includes(':')) return `http://${trimmed}`;
+      return `http://${trimmed}:${DEFAULT_SERVER_PORT}`;
+    }
+
+    // Live hosted web domain (HTTPS like Railway, custom domain, or production port)
+    if (window.location.protocol === 'https:') {
+      return window.location.origin;
+    }
+    if (window.location.hostname && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      if (!window.location.hostname.match(/^\d+\.\d+\.\d+\.\d+$/)) {
+        return window.location.origin;
+      }
+    }
+  }
+
   const ipOrHost = getStoredServerIP();
   if (ipOrHost.startsWith('http://') || ipOrHost.startsWith('https://')) {
     return ipOrHost.replace(/\/+$/, '');

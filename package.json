@@ -4,9 +4,11 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "start": "node server/index.js",
+    "build": "vite build",
+    "postinstall": "npm --prefix server install",
     "dev": "vite",
     "dev:all": "concurrently \"npm run dev\" \"npm run dev --prefix server\"",
-    "build": "vite build",
     "cap:build": "vite build && npx cap sync android",
     "cap:sync": "npx cap sync",
     "cap:open": "npx cap open android",

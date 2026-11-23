@@ -1459,6 +1459,25 @@ app.get('/api/admin/activity', authMiddleware, async (req, res) => {
   }
 });
 
+// ─── Production Frontend Static Serving (Railway / Single Service) ────────────
+const distPath = path.join(__dirname, '../dist');
+if (fs.existsSync(distPath)) {
+  console.log(`📦 Serving frontend static build from: ${distPath}`);
+  app.use(express.static(distPath));
+
+  app.use((req, res, next) => {
+    if (
+      req.method === 'GET' &&
+      !req.path.startsWith('/api') &&
+      !req.path.startsWith('/uploads') &&
+      !req.path.startsWith('/socket.io')
+    ) {
+      return res.sendFile(path.join(distPath, 'index.html'));
+    }
+    next();
+  });
+}
+
 // ─── Start Server ──────────────────────────────────────────────────────────────
 
 const isSqlite = sequelize.getDialect() === 'sqlite';
