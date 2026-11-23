@@ -11,6 +11,7 @@ const sequelize = require('./db');
 const User = require('./models/User');
 const { Truck, Cargo, Booking, BookingMessage, Notification, Complaint, LostCargoReport, LostCargoLog } = require('./models/Logistics');
 const { uploadToCloudinary } = require('./services/cloudinary');
+const { autoSeedDatabase } = require('./autoSeed');
 const {
   initWhatsApp,
   sendWhatsAppMessage,
@@ -1529,6 +1530,7 @@ const ensureSqliteColumns = async () => {
 sequelize.sync(isSqlite ? {} : { alter: true })
   .then(async () => {
     await ensureSqliteColumns();
+    await autoSeedDatabase(sequelize);
     console.log(`✅ ${isSqlite ? 'SQLite' : 'MySQL'} Database synced`);
     server.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Server running on port ${PORT} (0.0.0.0)`);
