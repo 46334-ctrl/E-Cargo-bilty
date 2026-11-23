@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { X, Printer, Download, FileText, Loader2, Eye, CheckCircle2, Truck, MapPin } from 'lucide-react';
+import { X, Printer, Download, FileText, Loader2, Eye, CheckCircle2, Truck } from 'lucide-react';
+import GpsMapPin from './GpsMapPin';
 import { generateBiltyPDFBlob, generateBiltyPDF } from '../utils/generateBiltyPDF';
 import { formatFreightPrice, stripWeightUnit } from '../utils/fareCalculator';
 import { useToast } from '../contexts/ToastContext';
@@ -121,29 +122,29 @@ export default function BiltyModal({ booking, onClose }) {
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/82 px-2.5 sm:px-4 py-3 sm:py-6"
+      className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/60 dark:bg-black/82 backdrop-blur-xs px-2.5 sm:px-4 py-3 sm:py-6"
       onClick={(e) => e.target === e.currentTarget && onClose?.()}
       role="dialog"
       aria-modal="true"
       aria-labelledby="bilty-modal-title"
     >
       <div
-        className="bg-[#0B1325]/98 border border-white/15 rounded-2xl sm:rounded-3xl shadow-[0_28px_72px_rgba(0,0,0,0.88)] w-full max-w-4xl max-h-[calc(100dvh-1.5rem)] sm:max-h-[92dvh] flex flex-col overflow-hidden relative modal-enter"
+        className="bg-white dark:bg-[#0B1325]/98 border border-slate-200 dark:border-white/15 rounded-2xl sm:rounded-3xl shadow-2xl dark:shadow-[0_28px_72px_rgba(0,0,0,0.88)] w-full max-w-4xl max-h-[calc(100dvh-1.5rem)] sm:max-h-[92dvh] flex flex-col overflow-hidden relative modal-enter"
       >
         {/* Modal Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 sm:gap-3 px-3.5 sm:px-6 py-3 sm:py-4 border-b border-white/12 shrink-0 bg-[#060B16]/85">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 sm:gap-3 px-3.5 sm:px-6 py-3 sm:py-4 border-b border-slate-200 dark:border-white/12 shrink-0 bg-slate-50 dark:bg-[#060B16]/85">
           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 w-full sm:w-auto">
-            <div className="w-11 h-8 sm:w-14 sm:h-11 rounded-xl bg-white border border-white/25 p-0.5 shadow-sm overflow-hidden shrink-0 flex items-center justify-center preserve-light">
+            <div className="w-11 h-8 sm:w-14 sm:h-11 rounded-xl bg-white border border-slate-200 dark:border-white/25 p-0.5 shadow-sm overflow-hidden shrink-0 flex items-center justify-center preserve-light">
               <img src="/logo.jpg?v=2" alt="E-CARGO-BILTY" className="w-full h-full object-contain" />
             </div>
             <div className="text-left min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 id="bilty-modal-title" className="text-sm sm:text-base font-black text-white leading-tight">
+                <h2 id="bilty-modal-title" className="text-sm sm:text-base font-black text-slate-900 dark:text-white leading-tight">
                   Official Digital Lorry Receipt
                 </h2>
-                <span className="font-urdu text-xs sm:text-sm text-orange-400 font-bold">رسید بلٹی</span>
+                <span className="font-urdu text-xs sm:text-sm text-orange-600 dark:text-orange-400 font-bold">رسید بلٹی</span>
               </div>
-              <p className="text-[10px] sm:text-[11px] text-slate-300 font-mono mt-0.5 truncate">
+              <p className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-300 font-mono mt-0.5 truncate">
                 {biltyNo} &nbsp;·&nbsp; {data.cargoTitle || 'Freight Consignment'}
               </p>
             </div>
@@ -151,11 +152,11 @@ export default function BiltyModal({ booking, onClose }) {
 
           <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap w-full sm:w-auto justify-between sm:justify-end">
             {/* Switch between Mobile-safe Receipt View and Embedded PDF */}
-            <div className="flex items-center bg-white/[0.08] border border-white/15 p-0.5 rounded-xl text-[11px] font-bold">
+            <div className="flex items-center bg-slate-200/70 dark:bg-white/[0.08] border border-slate-300 dark:border-white/15 p-0.5 rounded-xl text-[11px] font-bold">
               <button
                 type="button"
                 onClick={() => setViewMode('receipt')}
-                className={`px-2.5 py-1 rounded-lg flex items-center gap-1 cursor-pointer transition-all ${viewMode === 'receipt' ? 'bg-orange-600 text-white shadow-sm' : 'text-slate-300 hover:text-white'
+                className={`px-2.5 py-1 rounded-lg flex items-center gap-1 cursor-pointer transition-all ${viewMode === 'receipt' ? 'bg-orange-600 text-white shadow-sm' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                   }`}
               >
                 <Eye size={13} />
@@ -164,7 +165,7 @@ export default function BiltyModal({ booking, onClose }) {
               <button
                 type="button"
                 onClick={() => setViewMode('pdf')}
-                className={`px-2.5 py-1 rounded-lg flex items-center gap-1 cursor-pointer transition-all ${viewMode === 'pdf' ? 'bg-orange-600 text-white shadow-sm' : 'text-slate-300 hover:text-white'
+                className={`px-2.5 py-1 rounded-lg flex items-center gap-1 cursor-pointer transition-all ${viewMode === 'pdf' ? 'bg-orange-600 text-white shadow-sm' : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                   }`}
               >
                 <FileText size={13} />
@@ -176,7 +177,7 @@ export default function BiltyModal({ booking, onClose }) {
               type="button"
               onClick={handlePrint}
               disabled={viewMode === 'pdf' && (loading || !!error)}
-              className="px-2.5 sm:px-3 py-1.5 rounded-xl border border-white/20 bg-white/[0.08] hover:bg-white/15 text-slate-100 text-xs font-bold cursor-pointer shadow-sm flex items-center gap-1 transition-all"
+              className="px-2.5 sm:px-3 py-1.5 rounded-xl border border-slate-300 dark:border-white/20 bg-white dark:bg-white/[0.08] hover:bg-slate-100 dark:hover:bg-white/15 text-slate-800 dark:text-slate-100 text-xs font-bold cursor-pointer shadow-sm flex items-center gap-1 transition-all"
             >
               <Printer size={14} />
               <span className="hidden sm:inline">Print</span>
@@ -195,7 +196,7 @@ export default function BiltyModal({ booking, onClose }) {
               type="button"
               onClick={onClose}
               aria-label="Close modal"
-              className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+              className="w-8 h-8 flex items-center justify-center rounded-xl text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-white/10 transition-all cursor-pointer"
             >
               <X size={18} />
             </button>
@@ -203,7 +204,7 @@ export default function BiltyModal({ booking, onClose }) {
         </div>
 
         {/* Viewer Area */}
-        <div className="flex-1 relative bg-[#060B16]/90 overflow-y-auto min-h-[340px] sm:min-h-[500px]">
+        <div className="flex-1 relative bg-slate-100 dark:bg-[#060B16]/90 overflow-y-auto min-h-[340px] sm:min-h-[500px]">
           {viewMode === 'receipt' ? (
             <div className="p-4 sm:p-6">
               <div className="max-w-2xl mx-auto bg-white border-2 border-slate-800 rounded-xl overflow-hidden shadow-2xl preserve-light">
@@ -245,14 +246,14 @@ export default function BiltyModal({ booking, onClose }) {
                     <div>
                       <p className="text-[10px] font-bold uppercase text-slate-500">Origin</p>
                       <p className="font-bold text-slate-900 flex items-center gap-1 mt-0.5">
-                        <MapPin size={12} className="text-emerald-600 shrink-0" />
+                        <GpsMapPin size={12} className="shrink-0" />
                         <span>{data.origin || 'N/A'}</span>
                       </p>
                     </div>
                     <div>
                       <p className="text-[10px] font-bold uppercase text-slate-500">Destination</p>
                       <p className="font-bold text-slate-900 flex items-center gap-1 mt-0.5">
-                        <MapPin size={12} className="text-rose-600 shrink-0" />
+                        <GpsMapPin size={12} className="shrink-0" />
                         <span>{data.destination || 'N/A'}</span>
                       </p>
                     </div>
@@ -334,9 +335,9 @@ export default function BiltyModal({ booking, onClose }) {
         </div>
 
         {/* Footer hint */}
-        <div className="px-4 sm:px-6 py-2.5 border-t border-white/12 bg-[#060B16]/85 flex flex-col sm:flex-row items-center justify-between text-[10px] sm:text-[11px] text-slate-300 shrink-0 font-mono gap-1">
+        <div className="px-4 sm:px-6 py-2.5 border-t border-slate-200 dark:border-white/12 bg-slate-50 dark:bg-[#060B16]/85 flex flex-col sm:flex-row items-center justify-between text-[10px] sm:text-[11px] text-slate-600 dark:text-slate-300 shrink-0 font-mono gap-1">
           <span>Official Verified Consignment Note • Use Receipt tab if PDF preview is unsupported on mobile</span>
-          <span className="font-urdu text-emerald-400 font-bold text-xs sm:text-sm">تصدیق شدہ لاری بلٹی • قانونی دستاویز</span>
+          <span className="font-urdu text-emerald-600 dark:text-emerald-400 font-bold text-xs sm:text-sm">تصدیق شدہ لاری بلٹی • قانونی دستاویز</span>
         </div>
       </div>
     </div>

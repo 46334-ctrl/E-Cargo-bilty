@@ -16,13 +16,13 @@ export const TruckMorBadge = ({ text, subtext, className = '', light = false }) 
   const label = isUrdu ? (text || t('badgePeacock')) : (subtext || t('badgePeacock'));
   const tone = light
     ? 'border-slate-200 bg-white text-slate-800 hover:border-slate-300 shadow-2xs'
-    : 'border-white/15 bg-[#0B1325]/92 text-slate-100 hover:border-orange-400/40 shadow-[0_6px_16px_rgba(2,6,23,0.45)]';
+    : 'border-slate-200 dark:border-white/15 bg-white/95 dark:bg-[#0B1325]/92 text-slate-800 dark:text-slate-100 hover:border-orange-500/40 dark:hover:border-orange-400/40 shadow-xs dark:shadow-[0_6px_16px_rgba(2,6,23,0.45)]';
   return (
     <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full border text-xs transition-all select-none ${tone} ${className}`}>
-      <span className={light ? 'inline-flex items-center shrink-0' : 'inline-flex items-center shrink-0 rounded-md bg-white px-1 py-0.5 shadow-2xs preserve-light'}>
+      <span className="inline-flex items-center shrink-0 rounded-md bg-white px-1 py-0.5 shadow-2xs preserve-light">
         <img src="/logo.jpg?v=2" alt="E-CARGO-BILTY" className="w-7 h-5 object-contain select-none shrink-0" />
       </span>
-      <span className={isUrdu ? `font-urdu font-black text-xs ${light ? 'text-slate-800' : 'text-slate-100'}` : `font-sans font-bold text-xs tracking-tight ${light ? 'text-slate-700' : 'text-slate-100'}`}>
+      <span className={isUrdu ? 'font-urdu font-black text-xs text-slate-900 dark:text-slate-100' : 'font-sans font-bold text-xs tracking-tight text-slate-800 dark:text-slate-100'}>
         {label}
       </span>
     </div>
@@ -30,27 +30,9 @@ export const TruckMorBadge = ({ text, subtext, className = '', light = false }) 
 };
 
 /**
- * NazarBattuBadge - Protective talisman badge.
- * Shows only the selected language (either Urdu or English, never both).
+ * NazarBattuBadge - Removed as requested by user.
  */
-export const NazarBattuBadge = ({ text, className = '', dark = true }) => {
-  const { isUrdu, t } = useLanguage();
-  const label = isUrdu ? (text || t('badgeNazar')) : t('badgeNazar');
-  return (
-    <div
-      className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full border text-[11px] sm:text-xs font-bold shadow-2xs transition-all select-none whitespace-nowrap shrink-0 max-w-full ${
-        dark
-          ? 'border-white/20 bg-[#0B1325]/92 text-slate-100 hover:border-white/35'
-          : 'border-slate-200 bg-white text-slate-800 hover:border-slate-300'
-      } ${className}`}
-    >
-      <span className="w-2 h-2 rounded-full bg-[#F89020] border border-white/25 shadow-2xs shrink-0"></span>
-      <span className={`truncate ${isUrdu ? `font-urdu text-xs sm:text-sm font-bold ${dark ? 'text-white' : 'text-slate-800'}` : `font-sans text-[11px] sm:text-xs font-bold ${dark ? 'text-slate-100' : 'text-slate-700'}`}`}>
-        {label}
-      </span>
-    </div>
-  );
-};
+export const NazarBattuBadge = () => null;
 
 /**
  * TruckPatternBorder - Removed as requested by user.
@@ -75,19 +57,19 @@ export const TruckGhungrooTrim = ({ className = '' }) => (
  * TruckLotusArchBadge - Mughal arched jharoka badge with lotus flower rosette & vibrant borders.
  * Shows only the selected language (either Urdu or English, never both).
  */
-export const TruckLotusArchBadge = ({ text, subtext = '', className = '', light = false }) => {
+export const TruckLotusArchBadge = ({ text, subtext = '', className = '', light = null }) => {
   const { isUrdu, t } = useLanguage();
   const label = isUrdu ? (text || t('heritageBadge')) : (subtext || t('heritageBadge'));
+  const tone = light === true
+    ? 'border-slate-200 bg-white shadow-2xs text-slate-800'
+    : light === false
+    ? 'border-white/15 bg-[#0B1325]/92 shadow-[0_6px_16px_rgba(2,6,23,0.45)] text-slate-100'
+    : 'border-slate-200 dark:border-white/15 bg-white/95 dark:bg-[#0B1325]/92 text-slate-800 dark:text-slate-100 shadow-2xs';
   return (
-    <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-t-2xl rounded-b-lg border transition-all ${
-      light
-        ? 'border-slate-200 bg-white shadow-2xs'
-        : 'border-white/15 bg-[#0B1325]/92 shadow-[0_6px_16px_rgba(2,6,23,0.45)]'
-    } ${className}`}>
-      <FloralRosette size={14} />
+    <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border transition-all ${tone} ${className}`}>
       <span className={isUrdu
-        ? `font-urdu font-bold text-xs ${light ? 'text-slate-800' : 'text-slate-100'}`
-        : `font-sans font-bold text-xs ${light ? 'text-slate-700' : 'text-slate-100'}`
+        ? 'font-urdu font-bold text-xs text-slate-900 dark:text-slate-100'
+        : 'font-sans font-bold text-xs text-slate-800 dark:text-slate-100'
       }>
         {label}
       </span>
@@ -215,8 +197,9 @@ export const TruckPhotoShowcase = ({
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/40 to-slate-950/20" />
           <div className="absolute inset-0 p-3 sm:p-3.5 flex flex-col justify-between gap-2">
             <div className="flex flex-wrap items-center gap-1.5 min-w-0">
-              <UrduMotto text={activeTag} translation={activeTag} dark={dark} />
-              <NazarBattuBadge dark={dark} />
+              <span className="px-2.5 py-1 rounded-full bg-slate-900/80 border border-white/20 text-white text-[11px] font-mono font-bold uppercase tracking-wider shadow-sm">
+                {activeTag}
+              </span>
             </div>
             <div className="text-white flex flex-col gap-2 min-w-0">
               <div className={`min-w-0 ${isUrdu ? 'border-r-2 border-[#F89020] pr-2.5 text-right' : 'border-l-2 border-[#F89020] pl-2.5 text-left'}`}>
@@ -233,7 +216,6 @@ export const TruckPhotoShowcase = ({
                     <span aria-hidden="true">{isUrdu ? '←' : '→'}</span>
                   </span>
                 ) : <span />}
-                <TruckTaj size={24} className="shrink-0" />
               </div>
             </div>
           </div>
@@ -249,101 +231,19 @@ export const TruckPhotoShowcase = ({
 export const SindhiTruckTexture = () => null;
 
 /**
- * TruckTaj - Traditional Khyber Pass & Rawalpindi ornamental crown/taj motif.
- * Crown rendered in golden brass, ruby crimson, and turquoise enamel.
+ * TruckTaj - Removed as requested by user.
  */
-export const TruckTaj = ({ size = 28, className = '', color = '#EA580C' }) => (
-  <svg
-    width={size}
-    height={size * 0.55}
-    viewBox="0 0 100 55"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-    className={`inline-block ${className}`}
-  >
-    {/* Crown Base */}
-    <path
-      d="M10 50 L90 50 L95 42 L80 40 L88 22 L72 32 L60 8 L50 25 L40 8 L28 32 L12 22 L20 40 L5 42 Z"
-      fill="url(#tajGoldOrangeGrad)"
-      stroke="#334155"
-      strokeWidth="1.5"
-    />
-    {/* Center Jewels */}
-    <circle cx="50" cy="22" r="4.5" fill="#F89020" stroke="#FFF7ED" strokeWidth="1" />
-    <circle cx="30" cy="30" r="3.5" fill="#475569" stroke="#FFF7ED" strokeWidth="1" />
-    <circle cx="70" cy="30" r="3.5" fill="#475569" stroke="#FFF7ED" strokeWidth="1" />
-    <circle cx="50" cy="38" r="5" fill="#EA580C" stroke="#1E293B" strokeWidth="1" />
-    <defs>
-      <linearGradient id="tajGoldOrangeGrad" x1="0" y1="0" x2="100" y2="55" gradientUnits="userSpaceOnUse">
-        <stop offset="0%" stopColor="#EA580C" />
-        <stop offset="35%" stopColor="#F89020" />
-        <stop offset="70%" stopColor="#FB923C" />
-        <stop offset="100%" stopColor="#C2410C" />
-      </linearGradient>
-    </defs>
-  </svg>
-);
+export const TruckTaj = () => null;
 
 /**
- * FloralRosette - Sindhi Jandi & Truck Art brass flower medallion
+ * FloralRosette - Removed as requested by user.
  */
-export const FloralRosette = ({ size = 20, className = '' }) => (
-  <svg
-    width={size}
-    height={size}
-    viewBox="0 0 40 40"
-    fill="none"
-    xmlns="http://www.w3.org/2000/svg"
-    className={`inline-block ${className}`}
-  >
-    <circle cx="20" cy="20" r="18" stroke="#EA580C" strokeWidth="1.2" fill="#FFF7ED" />
-    {/* 8 Petals in Logistics Orange & Charcoal Slate */}
-    {[0, 45, 90, 135, 180, 225, 270, 315].map((angle, i) => (
-      <ellipse
-        key={i}
-        cx="20"
-        cy="11"
-        rx="3.5"
-        ry="7"
-        fill={i % 2 === 0 ? '#F89020' : '#475569'}
-        stroke="#1E293B"
-        strokeWidth="0.6"
-        transform={`rotate(${angle} 20 20)`}
-      />
-    ))}
-    <circle cx="20" cy="20" r="5" fill="#EA580C" stroke="#FFFFFF" strokeWidth="1" />
-  </svg>
-);
+export const FloralRosette = () => null;
 
 /**
- * UrduMotto / TruckPoetry - Authentic Pakistani truck poetry & slogans.
- * Shows only the selected language (either Urdu or English, never both).
+ * UrduMotto / TruckPoetry - Removed as requested by user.
  */
-export const UrduMotto = ({ text, translation, className = '', dark = true }) => {
-  const { isUrdu, t } = useLanguage();
-  const label = isUrdu ? (text || t('mottoLookLove')) : (translation || t('mottoLookLove'));
-  return (
-    <div
-      className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full border text-[11px] sm:text-xs shadow-xs hover:shadow-sm transition-all select-none whitespace-nowrap shrink-0 max-w-full ${
-        dark
-          ? 'border-orange-400/35 bg-slate-950/90 text-orange-200'
-          : 'border-orange-200 bg-orange-50 text-orange-900'
-      } ${className}`}
-      title={label}
-    >
-      <TruckTaj size={14} className="shrink-0" />
-      <span
-        className={`truncate ${
-          isUrdu
-            ? `font-urdu text-[11px] sm:text-[12px] font-bold tracking-wide ${dark ? 'text-orange-200' : 'text-orange-800'}`
-            : `font-sans text-[10px] sm:text-[11px] font-bold tracking-wide ${dark ? 'text-orange-200' : 'text-orange-800'}`
-        }`}
-      >
-        {label}
-      </span>
-    </div>
-  );
-};
+export const UrduMotto = () => null;
 
 /**
  * TruckPoetryBanner - Traditional decorated poetry ribbon found across truck body panels.
@@ -353,40 +253,36 @@ export const TruckPoetryBanner = ({
   text,
   subtext,
   className = '',
-  light = false
+  light = null
 }) => {
   const { isUrdu, t } = useLanguage();
   const mainText = isUrdu ? (text || t('poetryBanner')) : (subtext || t('poetryBanner'));
   const secondaryText = isUrdu ? t('poetrySubtext') : t('poetrySubtext');
+  const isLight = light === true;
+  const isDark = light === false;
   return (
     <div className={`relative px-4 py-2.5 rounded-2xl border text-center overflow-hidden transition-colors duration-200 ${
-      light
+      isLight
         ? 'border-slate-200 bg-white shadow-xs hover:shadow-sm'
-        : 'border-white/15 bg-[#0B1325]/94 shadow-[0_12px_28px_rgba(2,6,23,0.48)] hover:border-white/25'
+        : isDark
+        ? 'border-white/15 bg-[#0B1325]/94 shadow-[0_12px_28px_rgba(2,6,23,0.48)] hover:border-white/25'
+        : 'border-slate-200 dark:border-white/15 bg-white/95 dark:bg-[#0B1325]/94 shadow-xs dark:shadow-[0_12px_28px_rgba(2,6,23,0.48)] hover:border-slate-300 dark:hover:border-white/25'
     } ${className}`}>
-      <div className={light
-        ? 'absolute top-0 left-0 right-0 h-1 bg-[#F89020]'
-        : 'absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-orange-500 via-amber-400 to-cyan-400'
-      } />
+      <div className="absolute top-0 left-0 right-0 h-1 dark:h-[2px] bg-[#F89020]" />
       <div className="flex items-center justify-center gap-2 sm:gap-3 min-w-0">
-        <FloralRosette size={16} className="shrink-0" />
         <span className={isUrdu
-          ? `font-urdu text-base sm:text-lg font-black leading-snug ${light ? 'text-slate-900' : 'text-white'}`
-          : `font-sans text-xs sm:text-sm font-black leading-snug ${light ? 'text-slate-900' : 'text-white'}`
+          ? 'font-urdu text-base sm:text-lg font-black leading-snug text-slate-900 dark:text-white'
+          : 'font-sans text-xs sm:text-sm font-black leading-snug text-slate-900 dark:text-white'
         }>
           {mainText}
         </span>
-        <FloralRosette size={16} className="shrink-0" />
       </div>
       {secondaryText && (
-        <p className={`text-[10px] tracking-wider font-bold mt-0.5 ${light ? 'text-slate-600' : 'text-slate-300'} ${isUrdu ? 'font-urdu' : 'font-mono uppercase'}`}>
+        <p className={`text-[10px] tracking-wider font-bold mt-0.5 text-slate-500 dark:text-slate-300 ${isUrdu ? 'font-urdu' : 'font-mono uppercase'}`}>
           {secondaryText}
         </p>
       )}
-      <div className={light
-        ? 'absolute bottom-0 left-0 right-0 h-1 bg-[#F89020]'
-        : 'absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-cyan-400 via-amber-400 to-orange-500 opacity-75'
-      } />
+      <div className="absolute bottom-0 left-0 right-0 h-1 dark:h-[2px] bg-[#F89020] opacity-85" />
     </div>
   );
 };

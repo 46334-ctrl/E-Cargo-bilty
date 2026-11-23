@@ -17,9 +17,7 @@ import {
   Check
 } from 'lucide-react';
 import {
-  UrduMotto,
-  TruckBackground,
-  NazarBattuBadge
+  TruckBackground
 } from '../components/TruckArt';
 import {
   DEFAULT_SERVER_IP,
@@ -217,9 +215,9 @@ export default function Login() {
   const isPasswordValid = touched.password && !validatePassword(password, isUrdu);
 
   const getFieldBoxClass = (hasErr, isValid) => {
-    if (hasErr) return 'border-rose-500/80 ring-2 ring-rose-500/20 bg-rose-500/10';
-    if (isValid) return 'border-emerald-500/45 bg-[#0F1930]/85 focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/25';
-    return 'border-white/15 bg-[#0F1930]/85 focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/25';
+    if (hasErr) return 'border-rose-500/80 ring-2 ring-rose-500/20 bg-rose-50 dark:bg-rose-500/10';
+    if (isValid) return 'border-emerald-500/45 bg-white dark:bg-[#0F1930]/85 focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/25';
+    return 'border-slate-300 dark:border-white/15 bg-white dark:bg-[#0F1930]/85 focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/25';
   };
 
   const getIconTone = (hasErr, isValid) => {
@@ -241,10 +239,10 @@ export default function Login() {
             transform: 'translate3d(calc(var(--mx, 0) * -18px), calc(var(--my, 0) * -14px), 36px)'
           }}
         >
-          <div className="px-3.5 py-2 rounded-xl bg-[#0B1325]/95 border border-white/15 shadow-[0_14px_34px_rgba(0,0,0,0.68),inset_0_1px_0_rgba(255,255,255,0.1)] flex items-center gap-2 text-xs font-semibold text-slate-200">
-            <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            <Radio size={14} className="text-orange-400" />
-            <span className={isUrdu ? 'font-urdu text-xs text-slate-100' : 'font-mono text-[11px] text-slate-100'}>
+          <div className="px-3.5 py-2 rounded-xl bg-white/95 dark:bg-[#0B1325]/95 border border-slate-200 dark:border-white/15 shadow-[0_14px_34px_rgba(0,0,0,0.12)] dark:shadow-[0_14px_34px_rgba(0,0,0,0.68),inset_0_1px_0_rgba(255,255,255,0.1)] flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-200">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 dark:bg-emerald-400" />
+            <Radio size={14} className="text-orange-500 dark:text-orange-400" />
+            <span className={isUrdu ? 'font-urdu text-xs text-slate-800 dark:text-slate-100' : 'font-mono text-[11px] text-slate-800 dark:text-slate-100'}>
               {isUrdu ? 'ملک گیر نیٹ ورک • فعال' : 'Nationwide Network • Active'}
             </span>
           </div>
@@ -256,9 +254,9 @@ export default function Login() {
             transform: 'translate3d(calc(var(--mx, 0) * 18px), calc(var(--my, 0) * 14px), 44px)'
           }}
         >
-          <div className="px-3.5 py-2 rounded-xl bg-[#0B1325]/95 border border-white/15 shadow-[0_14px_34px_rgba(0,0,0,0.68),inset_0_1px_0_rgba(255,255,255,0.1)] flex items-center gap-2 text-xs font-semibold text-slate-200">
-            <ShieldCheck size={16} className="text-cyan-400" />
-            <span className={isUrdu ? 'font-urdu text-xs text-slate-100' : 'font-mono text-[11px] text-slate-100'}>
+          <div className="px-3.5 py-2 rounded-xl bg-white/95 dark:bg-[#0B1325]/95 border border-slate-200 dark:border-white/15 shadow-[0_14px_34px_rgba(0,0,0,0.12)] dark:shadow-[0_14px_34px_rgba(0,0,0,0.68),inset_0_1px_0_rgba(255,255,255,0.1)] flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-200">
+            <ShieldCheck size={16} className="text-cyan-600 dark:text-cyan-400" />
+            <span className={isUrdu ? 'font-urdu text-xs text-slate-800 dark:text-slate-100' : 'font-mono text-[11px] text-slate-800 dark:text-slate-100'}>
               {isUrdu ? '۱۰۰٪ مصدقہ ڈیجیٹل بلٹی' : '100% Verified e-Bilty'}
             </span>
           </div>
@@ -279,9 +277,9 @@ export default function Login() {
               {/* Clipped Surface Backdrop & Top Accent Ribbon (separate so preserve-3d depth stays intact) */}
               <div
                 aria-hidden="true"
-                className="pointer-events-none absolute inset-0 rounded-2xl sm:rounded-3xl overflow-hidden border border-white/15 shadow-[0_28px_72px_-15px_rgba(0,0,0,0.9),inset_0_1px_0_rgba(255,255,255,0.08)] ring-1 ring-white/5 bg-[#0B1325]/96"
+                className="pointer-events-none absolute inset-0 rounded-2xl sm:rounded-3xl overflow-hidden border border-slate-200 dark:border-white/15 shadow-[0_20px_50px_rgba(0,0,0,0.12)] dark:shadow-[0_28px_72px_-15px_rgba(0,0,0,0.9),inset_0_1px_0_rgba(255,255,255,0.08)] ring-1 ring-slate-900/5 dark:ring-white/5 bg-white/95 dark:bg-[#0B1325]/96 backdrop-blur-md"
               >
-                <div className="h-1.5 w-full bg-gradient-to-r from-[#EA580C] via-[#F89020] to-cyan-400" />
+                <div className="h-1.5 w-full bg-[#EA580C]" />
               </div>
 
               <div className="p-4 sm:p-7 pt-5 sm:pt-8 relative z-10 preserve-3d">
@@ -293,17 +291,12 @@ export default function Login() {
                     </div>
                   </div>
 
-                  <h1 className={`text-xl sm:text-2xl font-black text-white mb-1 tracking-tight depth-z-sm ${isUrdu ? 'font-urdu text-2xl' : ''}`}>
+                  <h1 className={`text-xl sm:text-2xl font-black text-slate-900 dark:text-white mb-1.5 tracking-tight depth-z-sm ${isUrdu ? 'font-urdu text-2xl' : ''}`}>
                     {t('loginWelcome')}
                   </h1>
-                  <p className={`text-xs sm:text-[13px] text-slate-300 mb-2.5 font-normal ${isUrdu ? 'font-urdu text-sm' : ''}`}>
+                  <p className={`text-xs sm:text-[13px] text-slate-600 dark:text-slate-300 font-normal mb-6 sm:mb-7 ${isUrdu ? 'font-urdu text-sm' : ''}`}>
                     {t('loginSub')}
                   </p>
-
-                  <div className="flex items-center justify-center gap-2 flex-wrap depth-z-sm">
-                    <UrduMotto />
-                    <NazarBattuBadge />
-                  </div>
                 </div>
 
                 {/* Error Alert Banner */}
@@ -332,8 +325,8 @@ export default function Login() {
                       htmlFor="login-email"
                       className={`block text-[11px] font-bold uppercase tracking-wider mb-1 transition-colors ${
                         emailError && touched.email
-                          ? 'text-rose-400'
-                          : 'text-slate-200 group-focus-within:text-orange-400'
+                          ? 'text-rose-600 dark:text-rose-400'
+                          : 'text-slate-700 dark:text-slate-200 group-focus-within:text-orange-500'
                       } ${isUrdu ? 'font-urdu text-xs' : ''}`}
                     >
                       {t('emailLabel')}
@@ -350,18 +343,18 @@ export default function Login() {
                         inputMode="email"
                         dir="ltr"
                         aria-invalid={Boolean(emailError && touched.email)}
-                        className={`block w-full rounded-xl ${isUrdu ? 'pr-9 pl-8 text-right' : 'pl-9 pr-8 text-left'} py-2.5 bg-transparent border-0 focus:outline-none text-white placeholder-slate-400 text-[15px] sm:text-sm font-medium`}
+                        className={`block w-full rounded-xl ${isUrdu ? 'pr-9 pl-8 text-right' : 'pl-9 pr-8 text-left'} py-2.5 bg-transparent border-0 focus:outline-none text-slate-900 dark:text-white placeholder-slate-400 text-[15px] sm:text-sm font-medium`}
                         placeholder={t('emailPlaceholder')}
                         value={email}
                         onChange={(e) => handleEmailChange(e.target.value)}
                         onBlur={() => handleBlur('email')}
                       />
                       {isEmailValid && (
-                        <Check size={14} className={`absolute top-1/2 -translate-y-1/2 ${isUrdu ? 'left-3' : 'right-3'} text-emerald-400 pointer-events-none`} />
+                        <Check size={14} className={`absolute top-1/2 -translate-y-1/2 ${isUrdu ? 'left-3' : 'right-3'} text-emerald-500 dark:text-emerald-400 pointer-events-none`} />
                       )}
                     </div>
                     {emailError && touched.email && (
-                      <p className={`flex items-center gap-1 text-rose-400 text-[11px] font-semibold mt-1 ${isUrdu ? 'font-urdu text-xs' : ''}`}>
+                      <p className={`flex items-center gap-1 text-rose-600 dark:text-rose-400 text-[11px] font-semibold mt-1 ${isUrdu ? 'font-urdu text-xs' : ''}`}>
                         <AlertCircle size={12} className="shrink-0" />
                         <span>{emailError}</span>
                       </p>
@@ -374,8 +367,8 @@ export default function Login() {
                       htmlFor="login-password"
                       className={`block text-[11px] font-bold uppercase tracking-wider mb-1 transition-colors ${
                         passwordError && touched.password
-                          ? 'text-rose-400'
-                          : 'text-slate-200 group-focus-within:text-orange-400'
+                          ? 'text-rose-600 dark:text-rose-400'
+                          : 'text-slate-700 dark:text-slate-200 group-focus-within:text-orange-500'
                       } ${isUrdu ? 'font-urdu text-xs' : ''}`}
                     >
                       {t('passwordLabel')}
@@ -391,7 +384,7 @@ export default function Login() {
                         autoComplete="current-password"
                         dir="ltr"
                         aria-invalid={Boolean(passwordError && touched.password)}
-                        className={`block w-full rounded-xl ${isUrdu ? 'pr-9 pl-10 text-right' : 'pl-9 pr-10 text-left'} py-2.5 bg-transparent border-0 focus:outline-none text-white placeholder-slate-400 text-[15px] sm:text-sm font-medium`}
+                        className={`block w-full rounded-xl ${isUrdu ? 'pr-9 pl-10 text-right' : 'pl-9 pr-10 text-left'} py-2.5 bg-transparent border-0 focus:outline-none text-slate-900 dark:text-white placeholder-slate-400 text-[15px] sm:text-sm font-medium`}
                         placeholder={t('passwordPlaceholder')}
                         value={password}
                         onChange={(e) => handlePasswordChange(e.target.value)}
@@ -402,14 +395,14 @@ export default function Login() {
                         aria-label={showPassword ? 'Hide password' : 'Show password'}
                         aria-pressed={showPassword}
                         onClick={() => setShowPassword(!showPassword)}
-                        className={`absolute inset-y-0 ${isUrdu ? 'left-0 pl-2.5 pr-1.5' : 'right-0 pr-2.5 pl-1.5'} flex items-center text-slate-400 hover:text-white transition-colors cursor-pointer`}
+                        className={`absolute inset-y-0 ${isUrdu ? 'left-0 pl-2.5 pr-1.5' : 'right-0 pr-2.5 pl-1.5'} flex items-center text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors cursor-pointer`}
                         title={showPassword ? 'Hide password' : 'Show password'}
                       >
                         {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                       </button>
                     </div>
                     {passwordError && touched.password && (
-                      <p className={`flex items-center gap-1 text-rose-400 text-[11px] font-semibold mt-1 ${isUrdu ? 'font-urdu text-xs' : ''}`}>
+                      <p className={`flex items-center gap-1 text-rose-600 dark:text-rose-400 text-[11px] font-semibold mt-1 ${isUrdu ? 'font-urdu text-xs' : ''}`}>
                         <AlertCircle size={12} className="shrink-0" />
                         <span>{passwordError}</span>
                       </p>
@@ -448,28 +441,28 @@ export default function Login() {
                 </form>
 
                 {/* Bottom Register Link */}
-                <div className={`mt-4 pt-3.5 border-t border-white/12 text-center text-xs text-slate-300 font-medium ${isUrdu ? 'font-urdu text-sm' : ''}`}>
+                <div className={`mt-4 pt-3.5 border-t border-slate-200 dark:border-white/12 text-center text-xs text-slate-600 dark:text-slate-300 font-medium ${isUrdu ? 'font-urdu text-sm' : ''}`}>
                   {t('dontHaveAccount')}{' '}
                   <Link
                     to="/register"
-                    className="text-orange-400 hover:text-orange-300 transition-colors font-bold underline underline-offset-4"
+                    className="text-orange-600 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300 transition-colors font-bold underline underline-offset-4"
                   >
                     {t('registerHere')}
                   </Link>
                 </div>
 
                 {/* Compact Server Connection Utility */}
-                <div className="mt-3 rounded-xl bg-white/[0.04] border border-white/10 px-3 py-2 text-center space-y-2">
-                  <div className="flex items-center justify-center gap-1.5 text-[11px] font-mono text-slate-400 flex-wrap">
-                    <Globe size={12} className="text-orange-400 shrink-0" />
+                <div className="mt-3 rounded-xl bg-slate-100/80 dark:bg-white/[0.04] border border-slate-200 dark:border-white/10 px-3 py-2 text-center space-y-2">
+                  <div className="flex items-center justify-center gap-1.5 text-[11px] font-mono text-slate-500 dark:text-slate-400 flex-wrap">
+                    <Globe size={12} className="text-orange-500 dark:text-orange-400 shrink-0" />
                     <span dir="ltr" className="inline-flex items-center gap-1">
                       <span>Server:</span>
-                      <span className="text-slate-100 font-semibold">{currentServerUrl}</span>
+                      <span className="text-slate-800 dark:text-slate-100 font-semibold">{currentServerUrl}</span>
                     </span>
                     <button
                       type="button"
                       onClick={() => setShowIpEditor(!showIpEditor)}
-                      className={`text-orange-400 hover:text-orange-300 font-bold hover:underline cursor-pointer ms-1 ${isUrdu ? 'font-urdu text-xs' : 'font-sans'}`}
+                      className={`text-orange-600 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300 font-bold hover:underline cursor-pointer ms-1 ${isUrdu ? 'font-urdu text-xs' : 'font-sans'}`}
                     >
                       ({showIpEditor ? (isUrdu ? 'چھپائیں' : 'Hide') : (isUrdu ? 'آئی پی تبدیل کریں' : 'Change IP')})
                     </button>
@@ -490,7 +483,7 @@ export default function Login() {
                         }}
                         placeholder="192.168.18.93"
                         aria-label="Server IP Address"
-                        className="flex-1 min-w-0 bg-[#0F1930]/90 border border-white/15 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition-all"
+                        className="flex-1 min-w-0 bg-white dark:bg-[#0F1930]/90 border border-slate-300 dark:border-white/15 rounded-lg px-2.5 py-1.5 text-xs font-mono text-slate-900 dark:text-white outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition-all"
                       />
                       <button
                         type="button"
@@ -505,7 +498,7 @@ export default function Login() {
                           type="button"
                           onClick={handleResetIp}
                           title="Reset to default IP"
-                          className="text-slate-400 hover:text-white text-xs px-1.5 py-1 rounded hover:bg-white/10 font-medium cursor-pointer"
+                          className="text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white text-xs px-1.5 py-1 rounded hover:bg-slate-200/50 dark:hover:bg-white/10 font-medium cursor-pointer"
                         >
                           Reset
                         </button>
@@ -516,7 +509,7 @@ export default function Login() {
                   {ipStatus.message && (
                     <p
                       className={`text-[11px] font-medium flex items-center justify-center gap-1 ${
-                        ipStatus.ok ? 'text-emerald-300' : 'text-amber-300'
+                        ipStatus.ok ? 'text-emerald-700 dark:text-emerald-300' : 'text-amber-700 dark:text-amber-300'
                       } ${isUrdu ? 'font-urdu text-xs' : ''}`}
                     >
                       {ipStatus.ok && <Check size={12} className="shrink-0" />}

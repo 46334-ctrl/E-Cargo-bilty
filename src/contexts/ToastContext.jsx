@@ -5,24 +5,24 @@ const ToastContext = createContext(null);
 
 const TONE_STYLES = {
   success: {
-    container: 'bg-[#0B1325]/92 border-emerald-500/40 text-emerald-100 shadow-[0_14px_34px_rgba(0,0,0,0.65)]',
+    container: 'bg-white/95 dark:bg-[#0B1325]/95 border-emerald-500/40 text-emerald-950 dark:text-emerald-100 shadow-[0_14px_34px_rgba(0,0,0,0.12)] dark:shadow-[0_14px_34px_rgba(0,0,0,0.65)]',
     icon: CheckCircle2,
-    iconColor: 'text-emerald-400'
+    iconColor: 'text-emerald-600 dark:text-emerald-400'
   },
   error: {
-    container: 'bg-[#0B1325]/92 border-rose-500/40 text-rose-100 shadow-[0_14px_34px_rgba(0,0,0,0.65)]',
+    container: 'bg-white/95 dark:bg-[#0B1325]/95 border-rose-500/40 text-rose-950 dark:text-rose-100 shadow-[0_14px_34px_rgba(0,0,0,0.12)] dark:shadow-[0_14px_34px_rgba(0,0,0,0.65)]',
     icon: AlertCircle,
-    iconColor: 'text-rose-400'
+    iconColor: 'text-rose-600 dark:text-rose-400'
   },
   warning: {
-    container: 'bg-[#0B1325]/92 border-amber-500/40 text-amber-100 shadow-[0_14px_34px_rgba(0,0,0,0.65)]',
+    container: 'bg-white/95 dark:bg-[#0B1325]/95 border-amber-500/40 text-amber-950 dark:text-amber-100 shadow-[0_14px_34px_rgba(0,0,0,0.12)] dark:shadow-[0_14px_34px_rgba(0,0,0,0.65)]',
     icon: AlertTriangle,
-    iconColor: 'text-amber-400'
+    iconColor: 'text-amber-600 dark:text-amber-400'
   },
   info: {
-    container: 'bg-[#0B1325]/92 border-white/15 text-slate-100 shadow-[0_14px_34px_rgba(0,0,0,0.65)]',
+    container: 'bg-white/95 dark:bg-[#0B1325]/95 border-slate-200 dark:border-white/15 text-slate-900 dark:text-slate-100 shadow-[0_14px_34px_rgba(0,0,0,0.12)] dark:shadow-[0_14px_34px_rgba(0,0,0,0.65)]',
     icon: Info,
-    iconColor: 'text-orange-400'
+    iconColor: 'text-orange-600 dark:text-orange-400'
   }
 };
 
@@ -125,27 +125,27 @@ export function ToastProvider({ children }) {
       {/* Accessible In-App Confirm Modal */}
       {confirmState && (
         <div
-          className="fixed inset-0 z-[10000] bg-black/80 flex items-center justify-center p-4"
+          className="fixed inset-0 z-[10000] bg-slate-900/60 dark:bg-black/80 backdrop-blur-xs flex items-center justify-center p-4"
           onClick={() => handleConfirmChoice(false)}
           role="dialog"
           aria-modal="true"
           aria-labelledby="confirm-dialog-title"
         >
           <div
-            className="bg-[#0B1325]/98 border border-white/15 rounded-2xl shadow-[0_24px_64px_rgba(0,0,0,0.85)] w-full max-w-md p-6 modal-enter"
+            className="bg-white dark:bg-[#0B1325]/98 border border-slate-200 dark:border-white/15 rounded-2xl shadow-2xl dark:shadow-[0_24px_64px_rgba(0,0,0,0.85)] w-full max-w-md p-6 modal-enter text-slate-900 dark:text-white"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 id="confirm-dialog-title" className="text-lg font-bold text-white mb-2">
+            <h3 id="confirm-dialog-title" className="text-lg font-bold text-slate-900 dark:text-white mb-2">
               {confirmState.title}
             </h3>
-            <p className="text-sm text-slate-300 leading-relaxed mb-6">
+            <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed mb-6">
               {confirmState.message}
             </p>
             <div className="flex items-center justify-end gap-2.5">
               <button
                 type="button"
                 onClick={() => handleConfirmChoice(false)}
-                className="px-4 py-2 text-sm font-semibold text-slate-200 bg-white/[0.08] border border-white/15 hover:bg-white/15 rounded-xl transition-colors cursor-pointer"
+                className="px-4 py-2 text-sm font-semibold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-white/[0.08] border border-slate-300 dark:border-white/15 hover:bg-slate-200 dark:hover:bg-white/15 rounded-xl transition-colors cursor-pointer"
               >
                 {confirmState.cancelLabel}
               </button>
@@ -155,8 +155,8 @@ export function ToastProvider({ children }) {
                 onClick={() => handleConfirmChoice(true)}
                 className={`px-4 py-2 text-sm font-semibold text-white rounded-xl transition-colors cursor-pointer ${
                   confirmState.tone === 'danger'
-                    ? 'bg-rose-600 hover:bg-rose-700'
-                    : 'bg-orange-600 hover:bg-orange-700'
+                    ? 'bg-rose-600 hover:bg-rose-700 shadow-xs'
+                    : 'bg-orange-600 hover:bg-orange-700 shadow-xs'
                 }`}
               >
                 {confirmState.confirmLabel}

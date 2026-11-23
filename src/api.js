@@ -251,5 +251,14 @@ export const adminAPI = {
   sendWhatsAppTest: (data) => api.post('/whatsapp/test', data),
 };
 
+export const lostCargoAPI = {
+  createReport: (formData) => api.post('/lost-cargo', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  getReports: (params) => api.get('/lost-cargo', { params }),
+  getReportById: (id) => api.get(`/lost-cargo/${id}`),
+  updateReport: (id, data) => api.patch(`/lost-cargo/${id}`, data),
+};
+
 export { socket };
 export default api;

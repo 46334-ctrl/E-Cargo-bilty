@@ -9,7 +9,8 @@ require('dotenv').config();
 const { Op } = require('sequelize');
 const sequelize = require('./db');
 const User = require('./models/User');
-const { Truck, Cargo, Booking, BookingMessage, Notification, Complaint } = require('./models/Logistics');
+const { Truck, Cargo, Booking, BookingMessage, Notification, Complaint, LostCargoReport, LostCargoLog } = require('./models/Logistics');
+const { uploadToCloudinary } = require('./services/cloudinary');
 const {
   initWhatsApp,
   sendWhatsAppMessage,
@@ -143,7 +144,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your_super_secret_key';
 
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const { name, email, password, role, cnic, phone, businessName, businessRegNumber } = req.body;
+    const { name, email, password, role, cnic, phone, businessName, businessRegNumber, city } = req.body;
 
     const existingUser = await User.findOne({ where: { email } });
     if (existingUser) return res.status(400).json({ message: 'User already exists' });
@@ -153,10 +154,10 @@ app.post('/api/auth/register', async (req, res) => {
     if (safeRole === 'shipper') safeRole = 'business';
 
     const status = safeRole === 'admin' ? 'active' : 'pending';
-    const user = await User.create({ name, email, password, role: safeRole, status, cnic, phone, businessName, businessRegNumber });
+    const user = await User.create({ name, email, password, role: safeRole, status, cnic, phone, businessName, businessRegNumber, city: city || 'Lahore' });
 
     const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-    res.status(201).json({ token, user: { id: user.id, name, email, role: user.role, status, cnic, phone, businessName, businessRegNumber } });
+    res.status(201).json({ token, user: { id: user.id, name, email, role: user.role, status, cnic, phone, businessName, businessRegNumber, city: user.city } });
   } catch (error) {
     console.error('Registration Error:', error);
     res.status(500).json({ message: error.message });
@@ -173,7 +174,7 @@ app.post('/api/auth/login', async (req, res) => {
     if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
 
     const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-    res.json({ token, user: { id: user.id, name: user.name, email, role: user.role, status: user.status } });
+    res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, status: user.status, city: user.city || 'Lahore', phone: user.phone, businessName: user.businessName } });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -429,7 +430,18 @@ app.post('/api/cargo', authMiddleware, async (req, res) => {
     } else if (req.user.role === 'transporter') {
       data.transporterId = req.user.id;
     }
+    // InDrive bargaining defaults
+    if (!data.fareStatus) {
+      data.fareStatus = 'Offered';
+    }
     const cargo = await Cargo.create(data);
+
+    // Notify transporter about new cargo offer
+    if (cargo.transporterId) {
+      const offeredPrice = cargo.totalFare ? Number(cargo.totalFare).toLocaleString() : 'Negotiable';
+      sendNotification(cargo.transporterId, `📦 New Cargo Offer: Customer offered Rs. ${offeredPrice} for "${cargo.title}". You can accept or bargain!`).catch(() => {});
+    }
+    io.emit('booking_updated');
 
     // Trigger WhatsApp notification for new shipment
     User.findByPk(cargo.businessOwnerId).then(shipper => {
@@ -447,6 +459,15 @@ app.patch('/api/cargo/:id', authMiddleware, async (req, res) => {
   try {
     await Cargo.update(req.body, { where: { id: req.params.id } });
     const cargo = await Cargo.findByPk(req.params.id);
+
+    // Bargaining notifications between customer and transporter
+    if (req.body.fareStatus === 'Agreed' && cargo.transporterId) {
+      const agreedFare = cargo.totalFare ? Number(cargo.totalFare).toLocaleString() : '';
+      sendNotification(cargo.transporterId, `✅ Customer accepted the counter-offer of Rs. ${agreedFare} for "${cargo.title}"! Deal confirmed.`).catch(() => {});
+    } else if (req.body.fareStatus === 'Counter-Offered' && req.body.counterBy === 'customer' && cargo.transporterId) {
+      const reOffer = cargo.totalFare ? Number(cargo.totalFare).toLocaleString() : '';
+      sendNotification(cargo.transporterId, `💬 Customer re-offered Rs. ${reOffer} for "${cargo.title}".`).catch(() => {});
+    }
 
     // If status updated on cargo, trigger WhatsApp notification if booking exists
     if (['In Transit', 'Loaded', 'Completed'].includes(req.body.status)) {
@@ -474,21 +495,50 @@ app.patch('/api/cargo/:id', authMiddleware, async (req, res) => {
       }).catch(e => console.error('WhatsApp cargo patch notification error:', e.message));
     }
 
+    io.emit('booking_updated');
     res.json({ ...cargo.toJSON(), _id: cargo.id });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 });
 
-
 app.patch('/api/cargo/:id/respond', authMiddleware, async (req, res) => {
   try {
-    const { status, rejectionReason } = req.body;
-    await Cargo.update({ status, rejectionReason }, { where: { id: req.params.id } });
+    const { status, rejectionReason, counterFare, counterNote, counterBy, totalFare, fareStatus } = req.body;
+    const updateData = {};
+    if (status !== undefined) updateData.status = status;
+    if (rejectionReason !== undefined) updateData.rejectionReason = rejectionReason;
+    if (counterFare !== undefined) updateData.counterFare = counterFare;
+    if (counterNote !== undefined) updateData.counterNote = counterNote;
+    if (counterBy !== undefined) updateData.counterBy = counterBy;
+    if (totalFare !== undefined) updateData.totalFare = totalFare;
+    if (fareStatus !== undefined) updateData.fareStatus = fareStatus;
+
+    await Cargo.update(updateData, { where: { id: req.params.id } });
     const cargo = await Cargo.findByPk(req.params.id);
+
     if (cargo.businessOwnerId) {
-      await sendNotification(cargo.businessOwnerId, `Your shipment request for "${cargo.title}" has been ${status.toLowerCase()}${status === 'Rejected' ? ` (Reason: ${rejectionReason})` : ''}`);
+      if (fareStatus === 'Counter-Offered' && counterFare) {
+        const orig = cargo.totalFare ? Number(cargo.totalFare).toLocaleString() : '';
+        await sendNotification(
+          cargo.businessOwnerId,
+          `💬 Transporter proposed counter-fare of Rs. ${Number(counterFare).toLocaleString()} for "${cargo.title}" (Your offer: Rs. ${orig}).`
+        );
+      } else if (fareStatus === 'Agreed' || status === 'Accepted') {
+        const agreed = (totalFare || cargo.totalFare) ? Number(totalFare || cargo.totalFare).toLocaleString() : '';
+        await sendNotification(
+          cargo.businessOwnerId,
+          `🤝 Transporter accepted your fare offer of Rs. ${agreed} for "${cargo.title}"! Shipment confirmed.`
+        );
+      } else if (status === 'Rejected') {
+        await sendNotification(
+          cargo.businessOwnerId,
+          `Your shipment request for "${cargo.title}" has been rejected${rejectionReason ? ` (Reason: ${rejectionReason})` : ''}`
+        );
+      }
     }
+
+    io.emit('booking_updated');
     res.json({ ...cargo.toJSON(), _id: cargo.id });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -605,11 +655,21 @@ app.patch('/api/bookings/:id', authMiddleware, async (req, res) => {
       }
     }
 
-    // When booking is Accepted: notify transporter
-    if (req.body.status === 'Accepted') {
+    // When booking is Counter-Offered by Truck Owner / Driver
+    if (req.body.status === 'Counter-Offered') {
+      const counterPriceStr = req.body.counterPrice || booking.counterPrice;
       await sendNotification(
         booking.transporterId,
-        `✅ Truck owner accepted your booking request for "${booking.cargoTitle}" (Truck: ${booking.truckPlate}).`
+        `💬 Driver/Truck Owner proposed a counter-fare of Rs. ${counterPriceStr} for "${booking.cargoTitle}" (Your offer: Rs. ${booking.price}).`
+      );
+    }
+
+    // When booking is Accepted: notify transporter or driver
+    if (req.body.status === 'Accepted') {
+      const target = req.user.id.toString() === booking.transporterId.toString() ? booking.truckOwnerId : booking.transporterId;
+      await sendNotification(
+        target,
+        `✅ Booking & Fare of Rs. ${booking.price} confirmed for "${booking.cargoTitle}" (Truck: ${booking.truckPlate}).`
       );
     }
 
@@ -625,7 +685,7 @@ app.patch('/api/bookings/:id', authMiddleware, async (req, res) => {
     const targetId = req.user.id.toString() === booking.truckOwnerId.toString()
       ? booking.transporterId
       : booking.truckOwnerId;
-    if (!['Accepted', 'Rejected', 'In Transit'].includes(req.body.status)) {
+    if (!['Accepted', 'Rejected', 'In Transit', 'Counter-Offered'].includes(req.body.status)) {
       await sendNotification(targetId, `Booking status updated to ${booking.status} for ${booking.cargoTitle}`);
     }
 
@@ -786,6 +846,377 @@ app.patch('/api/complaints/:id', authMiddleware, async (req, res) => {
     const complaint = await Complaint.findByPk(req.params.id);
     res.json({ ...complaint.toJSON(), _id: complaint.id });
   } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// ─── Lost & Missing Cargo Tracking Portal APIs ────────────────────────────────
+
+// 1. File a new Lost / Missing / Damaged Cargo Report (with optional Cloudinary photo evidence)
+app.post('/api/lost-cargo', authMiddleware, upload.single('evidenceImage'), async (req, res) => {
+  try {
+    const {
+      biltyId,
+      biltyNo,
+      issueType,
+      description,
+      lastKnownLocation
+    } = req.body;
+
+    if (!description || !description.trim()) {
+      return res.status(400).json({ message: 'Description of the lost/damaged cargo incident is required' });
+    }
+
+    // Resolve bilty/cargo ID
+    let rawBiltyId = biltyId || biltyNo;
+    if (!rawBiltyId) {
+      return res.status(400).json({ message: 'Bilty ID or Number is required' });
+    }
+    if (typeof rawBiltyId === 'string' && rawBiltyId.toUpperCase().startsWith('BLT-')) {
+      rawBiltyId = rawBiltyId.replace(/BLT-/i, '');
+    }
+    const resolvedBiltyId = parseInt(rawBiltyId, 10);
+    if (isNaN(resolvedBiltyId) || resolvedBiltyId <= 0) {
+      return res.status(400).json({ message: 'Invalid Bilty reference number' });
+    }
+
+    const cargo = await Cargo.findByPk(resolvedBiltyId, {
+      include: [
+        { model: User, as: 'businessOwner', attributes: ['id', 'name', 'phone', 'email'] },
+        { model: User, as: 'transporter', attributes: ['id', 'name', 'phone', 'email'] }
+      ]
+    });
+
+    if (!cargo) {
+      return res.status(404).json({ message: `Bilty #BLT-${resolvedBiltyId} could not be found in cargo records` });
+    }
+
+    // Business shippers can only report incidents for their own bilties
+    if (req.user.role === 'business' && cargo.businessOwnerId && cargo.businessOwnerId !== req.user.id) {
+      return res.status(403).json({ message: 'Access denied: You can only file reports for your own shipments' });
+    }
+
+    let evidenceImageUrl = null;
+    if (req.file) {
+      // 1. Try Cloudinary upload
+      const cloudUrl = await uploadToCloudinary(req.file.path, 'e_cargo_lost_evidence');
+      if (cloudUrl) {
+        evidenceImageUrl = cloudUrl;
+      } else {
+        // Fallback to local server static URL
+        evidenceImageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+      }
+    } else if (req.body.evidenceImageUrl) {
+      evidenceImageUrl = req.body.evidenceImageUrl;
+    }
+
+    const validIssueTypes = ['Not Delivered', 'Missing Items', 'Lost in Transit', 'Damaged'];
+    const finalIssueType = validIssueTypes.includes(issueType) ? issueType : 'Lost in Transit';
+
+    const report = await LostCargoReport.create({
+      biltyId: cargo.id,
+      reportedByUserId: req.user.id,
+      transporterId: cargo.transporterId || null,
+      issueType: finalIssueType,
+      description: description.trim(),
+      evidenceImageUrl,
+      lastKnownLocation: lastKnownLocation && lastKnownLocation.trim() ? lastKnownLocation.trim() : (cargo.destination || 'In Transit'),
+      status: 'Reported'
+    });
+
+    // Create initial timeline entry in lost_cargo_logs
+    await LostCargoLog.create({
+      reportId: report.id,
+      updatedByUserId: req.user.id,
+      role: req.user.role,
+      actionNote: `Incident reported by ${req.user.role} (${req.user.name || req.user.email}): "${finalIssueType}" - ${description.trim().slice(0, 150)}`,
+      statusChangedTo: 'Reported'
+    });
+
+    // Real-time socket broadcast
+    io.emit('lost_cargo_created', {
+      reportId: report.id,
+      biltyNo: `BLT-${cargo.id}`,
+      issueType: finalIssueType,
+      reportedBy: req.user.id,
+      transporterId: cargo.transporterId
+    });
+
+    // In-app alert for assigned transporter
+    if (cargo.transporterId) {
+      await Notification.create({
+        userId: cargo.transporterId,
+        message: `🚨 Lost/Missing Cargo Incident: Report #${report.id} filed for Bilty #BLT-${cargo.id} (${finalIssueType}). Please investigate.`
+      });
+    }
+
+    // Fetch and return complete record
+    const createdData = await LostCargoReport.findByPk(report.id, {
+      include: [
+        { model: Cargo, as: 'bilty' },
+        { model: User, as: 'reportedBy', attributes: ['id', 'name', 'email', 'phone', 'businessName', 'city'] },
+        { model: User, as: 'transporter', attributes: ['id', 'name', 'email', 'phone', 'businessName', 'city'] },
+        {
+          model: LostCargoLog,
+          as: 'logs',
+          include: [{ model: User, as: 'updater', attributes: ['id', 'name', 'role'] }]
+        }
+      ]
+    });
+
+    res.status(201).json(createdData);
+  } catch (error) {
+    console.error('Error in POST /api/lost-cargo:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// 2. List all Lost Cargo Reports (role-filtered for Admin, Transporter, and Business Owner)
+app.get('/api/lost-cargo', authMiddleware, async (req, res) => {
+  try {
+    const { status, issueType, transporterId, search } = req.query;
+    const where = {};
+
+    if (req.user.role === 'business') {
+      where.reportedByUserId = req.user.id;
+    } else if (req.user.role === 'transporter') {
+      where.transporterId = req.user.id;
+    }
+
+    if (transporterId && req.user.role === 'admin') {
+      where.transporterId = transporterId;
+    }
+    if (status && status !== 'all') {
+      where.status = status;
+    }
+    if (issueType && issueType !== 'all') {
+      where.issueType = issueType;
+    }
+
+    const reports = await LostCargoReport.findAll({
+      where,
+      include: [
+        { 
+          model: Cargo, 
+          as: 'bilty',
+          attributes: ['id', 'title', 'origin', 'destination', 'weight', 'assignedTruck', 'status', 'totalFare', 'recipients', 'pickupDetails']
+        },
+        { 
+          model: User, 
+          as: 'reportedBy', 
+          attributes: ['id', 'name', 'email', 'phone', 'businessName', 'city'] 
+        },
+        { 
+          model: User, 
+          as: 'transporter', 
+          attributes: ['id', 'name', 'email', 'phone', 'businessName', 'city'] 
+        },
+        {
+          model: LostCargoLog,
+          as: 'logs',
+          include: [{ model: User, as: 'updater', attributes: ['id', 'name', 'role'] }]
+        }
+      ],
+      order: [['created_at', 'DESC']]
+    });
+
+    let result = reports.map(r => {
+      const j = r.toJSON();
+      return {
+        ...j,
+        createdAt: j.created_at || j.createdAt,
+        updatedAt: j.updated_at || j.updatedAt
+      };
+    });
+
+    // Apply search filter if specified
+    if (search && search.trim()) {
+      const q = search.trim().toLowerCase();
+      result = result.filter(item => {
+        const bNo = `blt-${item.biltyId}`.toLowerCase();
+        const bTitle = (item.bilty?.title || '').toLowerCase();
+        const repName = (item.reportedBy?.name || item.reportedBy?.businessName || '').toLowerCase();
+        const transName = (item.transporter?.name || item.transporter?.businessName || '').toLowerCase();
+        const dest = (item.bilty?.destination || '').toLowerCase();
+        const orig = (item.bilty?.origin || '').toLowerCase();
+        const loc = (item.lastKnownLocation || '').toLowerCase();
+        const desc = (item.description || '').toLowerCase();
+        return bNo.includes(q) || bTitle.includes(q) || repName.includes(q) ||
+               transName.includes(q) || dest.includes(q) || orig.includes(q) || loc.includes(q) || desc.includes(q);
+      });
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error('Error in GET /api/lost-cargo:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// 3. Get single Lost Cargo Report with joined traceability and timeline
+app.get('/api/lost-cargo/:id', authMiddleware, async (req, res) => {
+  try {
+    const report = await LostCargoReport.findByPk(req.params.id, {
+      include: [
+        { model: Cargo, as: 'bilty' },
+        { model: User, as: 'reportedBy', attributes: ['id', 'name', 'email', 'phone', 'businessName', 'city', 'cnic'] },
+        { model: User, as: 'transporter', attributes: ['id', 'name', 'email', 'phone', 'businessName', 'city'] },
+        {
+          model: LostCargoLog,
+          as: 'logs',
+          include: [{ model: User, as: 'updater', attributes: ['id', 'name', 'role'] }]
+        }
+      ],
+      order: [
+        [{ model: LostCargoLog, as: 'logs' }, 'created_at', 'ASC']
+      ]
+    });
+
+    if (!report) {
+      return res.status(404).json({ message: 'Lost cargo report not found' });
+    }
+
+    // Role verification
+    if (req.user.role === 'business' && report.reportedByUserId !== req.user.id) {
+      return res.status(403).json({ message: 'Access denied: You cannot view this report' });
+    }
+    if (req.user.role === 'transporter' && report.transporterId !== req.user.id) {
+      return res.status(403).json({ message: 'Access denied: This report is not assigned to your fleet' });
+    }
+
+    const data = report.toJSON();
+
+    // Query assigned truck & driver info from Booking and Truck tables
+    let truckDriverInfo = null;
+    if (report.biltyId) {
+      const booking = await Booking.findOne({
+        where: { cargoId: report.biltyId }
+      });
+      if (booking) {
+        const truck = await Truck.findByPk(booking.truckId, {
+          include: [{ model: User, as: 'owner', attributes: ['id', 'name', 'phone'] }]
+        });
+        truckDriverInfo = {
+          plateNumber: booking.truckPlate || truck?.plateNumber || report.bilty?.assignedTruck || 'Assigned',
+          truckType: truck?.truckType || 'Heavy Freight Carrier',
+          driverName: truck?.driverName || 'Designated Fleet Driver',
+          driverMobile: truck?.driverMobile || truck?.owner?.phone || 'N/A',
+          truckOwnerName: truck?.owner?.name || 'Fleet Operator',
+          eta: booking.eta || 'N/A',
+          bookingStatus: booking.status
+        };
+      } else if (report.bilty?.assignedTruck) {
+        const truck = await Truck.findOne({ where: { plateNumber: report.bilty.assignedTruck } });
+        if (truck) {
+          truckDriverInfo = {
+            plateNumber: truck.plateNumber,
+            truckType: truck.truckType,
+            driverName: truck.driverName || 'Designated Fleet Driver',
+            driverMobile: truck.driverMobile || 'N/A',
+            loc: truck.loc
+          };
+        }
+      }
+    }
+
+    res.json({
+      ...data,
+      createdAt: data.created_at || data.createdAt,
+      updatedAt: data.updated_at || data.updatedAt,
+      logs: (data.logs || []).map(l => ({
+        ...l,
+        createdAt: l.created_at || l.createdAt
+      })),
+      truckDriverInfo
+    });
+  } catch (error) {
+    console.error('Error in GET /api/lost-cargo/:id:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// 4. Update status, location, resolution notes, and append investigation timeline log
+app.patch('/api/lost-cargo/:id', authMiddleware, async (req, res) => {
+  if (req.user.role !== 'admin' && req.user.role !== 'transporter') {
+    return res.status(403).json({ message: 'Only Admin and the assigned Transporter can update investigation status' });
+  }
+
+  try {
+    const report = await LostCargoReport.findByPk(req.params.id);
+    if (!report) {
+      return res.status(404).json({ message: 'Lost cargo report not found' });
+    }
+
+    if (req.user.role === 'transporter' && report.transporterId !== req.user.id) {
+      return res.status(403).json({ message: 'Access denied: You can only update reports assigned to your logistics fleet' });
+    }
+
+    const { status, lastKnownLocation, resolutionNotes, actionNote } = req.body;
+    const updates = {};
+    let statusChanged = false;
+
+    if (status && status !== report.status) {
+      updates.status = status;
+      statusChanged = true;
+    }
+    if (lastKnownLocation !== undefined && lastKnownLocation !== null) {
+      updates.lastKnownLocation = lastKnownLocation.trim();
+    }
+    if (resolutionNotes !== undefined && resolutionNotes !== null) {
+      updates.resolutionNotes = resolutionNotes.trim();
+    }
+
+    await report.update(updates);
+
+    // Append log entry to lost_cargo_logs
+    const logNote = actionNote && actionNote.trim() 
+      ? actionNote.trim() 
+      : (statusChanged ? `Status updated from "${report.status}" to "${status}"` : 'Investigation updated');
+
+    await LostCargoLog.create({
+      reportId: report.id,
+      updatedByUserId: req.user.id,
+      role: req.user.role,
+      actionNote: logNote,
+      statusChangedTo: status || report.status
+    });
+
+    // Notify the customer who reported the missing cargo
+    if (report.reportedByUserId) {
+      await Notification.create({
+        userId: report.reportedByUserId,
+        message: `📢 Missing Cargo Update (#BLT-${report.biltyId}): Status is now "${status || report.status}". ${logNote.slice(0, 80)}`
+      });
+    }
+
+    // Real-time broadcast
+    io.emit('lost_cargo_updated', {
+      reportId: report.id,
+      status: status || report.status,
+      lastKnownLocation: report.lastKnownLocation,
+      updatedByRole: req.user.role
+    });
+
+    // Return updated record
+    const updatedRecord = await LostCargoReport.findByPk(report.id, {
+      include: [
+        { model: Cargo, as: 'bilty' },
+        { model: User, as: 'reportedBy', attributes: ['id', 'name', 'email', 'phone', 'businessName', 'city'] },
+        { model: User, as: 'transporter', attributes: ['id', 'name', 'email', 'phone', 'businessName', 'city'] },
+        {
+          model: LostCargoLog,
+          as: 'logs',
+          include: [{ model: User, as: 'updater', attributes: ['id', 'name', 'role'] }]
+        }
+      ],
+      order: [
+        [{ model: LostCargoLog, as: 'logs' }, 'created_at', 'ASC']
+      ]
+    });
+
+    res.json(updatedRecord);
+  } catch (error) {
+    console.error('Error in PATCH /api/lost-cargo/:id:', error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -1048,11 +1479,18 @@ const ensureSqliteColumns = async () => {
     `ALTER TABLE cargo ADD COLUMN fuel_surcharge REAL;`,
     `ALTER TABLE cargo ADD COLUMN tax_amount REAL;`,
     `ALTER TABLE cargo ADD COLUMN total_fare REAL;`,
+    `ALTER TABLE cargo ADD COLUMN counter_fare REAL;`,
+    `ALTER TABLE cargo ADD COLUMN counter_note TEXT;`,
+    `ALTER TABLE cargo ADD COLUMN counter_by TEXT;`,
+    `ALTER TABLE cargo ADD COLUMN fare_status TEXT DEFAULT 'Offered';`,
     `ALTER TABLE bookings ADD COLUMN delivery_code TEXT;`,
     `ALTER TABLE bookings ADD COLUMN receiver_signature TEXT;`,
     `ALTER TABLE bookings ADD COLUMN pod_photo_url TEXT;`,
     `ALTER TABLE bookings ADD COLUMN condition_status TEXT DEFAULT 'Good Condition';`,
-    `ALTER TABLE bookings ADD COLUMN discrepancy_notes TEXT;`
+    `ALTER TABLE bookings ADD COLUMN discrepancy_notes TEXT;`,
+    `ALTER TABLE bookings ADD COLUMN counter_price TEXT;`,
+    `ALTER TABLE bookings ADD COLUMN counter_note TEXT;`,
+    `ALTER TABLE users ADD COLUMN city TEXT DEFAULT 'Lahore';`
   ];
   for (const q of queries) {
     try {
@@ -1060,6 +1498,12 @@ const ensureSqliteColumns = async () => {
     } catch (e) {
       // Column already exists or table handles it
     }
+  }
+  try {
+    await LostCargoReport.sync();
+    await LostCargoLog.sync();
+  } catch (e) {
+    console.warn('Lost cargo sync info:', e.message);
   }
 };
 

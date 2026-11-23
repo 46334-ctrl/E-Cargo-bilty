@@ -37,6 +37,11 @@ const User = sequelize.define('User', {
     type: DataTypes.STRING,
     allowNull: true
   },
+  city: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    defaultValue: 'Lahore'
+  },
   businessName: {
     type: DataTypes.STRING,
     allowNull: true,

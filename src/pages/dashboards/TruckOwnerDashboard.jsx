@@ -2,14 +2,17 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useToast } from '../../contexts/ToastContext';
 import {
-  Truck, Navigation, List, MapPin, UploadCloud, AlertCircle,
+  Truck, List, UploadCloud, AlertCircle,
   CheckCircle, Plus, X, Trash2, Edit, Send, MessageSquare,
-  Calendar, Clock, Check, Camera, FileCheck, PenTool, RotateCcw, AlertTriangle, ShieldCheck, Radio, FileText, Loader2
+  Calendar, Clock, Check, Camera, FileCheck, PenTool, RotateCcw, AlertTriangle, ShieldCheck, Radio, FileText, Loader2,
+  Handshake, TrendingUp, Coins
 } from 'lucide-react';
+import GpsMapPin from '../../components/GpsMapPin';
 import BiltyModal from '../../components/BiltyModal';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { logisticsAPI, authAPI, socket, resolveAssetUrl } from '../../api';
-import { formatFreightPrice, formatWeightTons } from '../../utils/fareCalculator';
+import { formatFreightPrice, formatWeightTons, BARGAIN_QUICK_INCREMENTS } from '../../utils/fareCalculator';
+import { sortByProximity, getProximityBadge, getProximityDistance } from '../../utils/proximity';
 import MapViewer, { CITY_COORDINATES, getCoordinatesForLocation } from '../../components/MapViewer';
 import SearchSelect from '../../components/SearchSelect';
 import UnitInput from '../../components/UnitInput';
@@ -74,6 +77,12 @@ export default function TruckOwnerDashboard() {
   const [completingBooking, setCompletingBooking] = useState(null);
   const [pod, setPod] = useState('');
 
+  // Direct Fare Bargaining state
+  const [showDriverBargaining, setShowDriverBargaining] = useState(false);
+  const [driverCounterFare, setDriverCounterFare] = useState('');
+  const [driverCounterNote, setDriverCounterNote] = useState('');
+  const [isBargainingSubmitting, setIsBargainingSubmitting] = useState(false);
+
   // Touchscreen e-POD states
   const [deliveryCode, setDeliveryCode] = useState('');
   const [podPhotoFile, setPodPhotoFile] = useState(null);
@@ -83,6 +92,13 @@ export default function TruckOwnerDashboard() {
   const signatureCanvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasSignature, setHasSignature] = useState(false);
+
+  // Proximity Prioritization for Truck Owner
+  const userCity = currentUser?.city || userData?.city || 'Lahore';
+
+  const sortedBookings = useMemo(() => {
+    return sortByProximity(bookings, userCity, b => b.cargo?.origin || 'Lahore', isUrdu);
+  }, [bookings, userCity, isUrdu]);
 
   useEffect(() => {
     const onUiBack = (e) => {
@@ -416,6 +432,33 @@ export default function TruckOwnerDashboard() {
     }
   };
 
+  const handleDriverSendCounterOffer = async (bookingId) => {
+    const counterAmount = parseFloat(driverCounterFare);
+    if (!counterAmount || counterAmount <= 0) {
+      toast.error(isUrdu ? 'برائے مہربانی نیا کرایہ درج کریں' : 'Please specify a valid counter-fare amount');
+      return;
+    }
+    if (isBargainingSubmitting) return;
+    setIsBargainingSubmitting(true);
+    try {
+      await logisticsAPI.updateBooking(bookingId, {
+        status: 'Counter-Offered',
+        counterPrice: String(counterAmount),
+        counterNote: driverCounterNote || (isUrdu ? 'ڈرائیور نے کرایہ بڑھانے کی جوابی پیشکش کی' : 'Driver requested higher fare')
+      });
+      toast.success(isUrdu ? `کاؤنٹر پیشکش Rs. ${counterAmount.toLocaleString()} بھیج دی گئی!` : `Counter-offer of Rs. ${counterAmount.toLocaleString()} sent to transporter!`);
+      setShowDriverBargaining(false);
+      setDriverCounterFare('');
+      setDriverCounterNote('');
+      fetchData();
+    } catch (e) {
+      console.error(e);
+      toast.error('Failed to send counter-offer');
+    } finally {
+      setIsBargainingSubmitting(false);
+    }
+  };
+
   const handleStartTransit = async (booking) => {
     try {
       const bookingId = booking._id || booking.id;
@@ -591,7 +634,7 @@ export default function TruckOwnerDashboard() {
     <div className="dash-dark-theme w-full min-w-0 max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-5 sm:py-8 relative page-enter">
       {/* Command Header Panel */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6 relative z-10 rounded-2xl sm:rounded-3xl bg-[#0B1325]/96 border border-white/15 p-4 sm:p-6 shadow-[0_18px_48px_-14px_rgba(0,0,0,0.75)] overflow-hidden">
-        <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-[#EA580C] via-[#F89020] to-cyan-400" />
+        <div className="absolute inset-x-0 top-0 h-[2px] bg-[#EA580C]" />
         <div className="text-left min-w-0 w-full">
           <div className="flex items-center gap-2 mb-2 flex-wrap">
             <span className="text-xs font-bold uppercase tracking-wider text-orange-300 bg-orange-500/15 px-2.5 py-0.5 rounded-full border border-orange-400/35">
@@ -758,8 +801,9 @@ export default function TruckOwnerDashboard() {
 
                           {/* Interactive Relocate Depot Dropdown */}
                           <div className="mt-3 flex items-center gap-2 flex-wrap">
-                            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 font-mono">
-                              <MapPin size={13} className="text-orange-600" /> Relocate Depot:
+                            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5 font-mono">
+                              <GpsMapPin size={13} className="shrink-0" />
+                              <span>Relocate Depot:</span>
                             </span>
                             <select
                               value={PAKISTAN_CITIES.find(c => (c.name || '').toLowerCase() === (truck.loc || '').toLowerCase())?.name || truck.loc || 'Lahore'}
@@ -845,35 +889,49 @@ export default function TruckOwnerDashboard() {
                 <h3 className="text-xs font-bold text-slate-600 tracking-wider uppercase text-left">
                   {bookings.filter(b => b.status !== 'Completed').length} active assignments in dispatch
                 </h3>
+                <span className="text-[10px] text-slate-500 font-medium">
+                  {isUrdu ? `آپ کے شہر (${userCity}) سے شروع ہونے والی ترسیلات سب سے اوپر ہیں` : `Pickups closest to your hub (${userCity}) shown first`}
+                </span>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[450px]">
                 {/* Left assignments list */}
                 <div className="lg:col-span-5 bg-white border border-slate-200 rounded-2xl p-4 overflow-y-auto max-h-[500px] space-y-3 shadow-xs">
-                  {bookings
+                  {sortedBookings
                     .filter(b => b.status !== 'Completed')
                     .map(b => {
                       const isSelected = selectedBooking?._id === b._id;
+                      const isLocal = b._proximityDistance === 0;
                       return (
                         <div
                           key={b._id}
                           onClick={() => setSelectedBooking(b)}
-                          className={`p-4 rounded-xl border transition-all cursor-pointer text-left relative overflow-hidden ${isSelected
-                            ? 'bg-orange-50/50 border-2 border-orange-600 shadow-sm'
-                            : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
-                            }`}
+                          className={`p-4 rounded-xl border transition-all cursor-pointer text-left relative overflow-hidden ${
+                            isSelected
+                              ? 'bg-orange-50/50 border-2 border-orange-600 shadow-sm'
+                              : isLocal
+                                ? 'bg-emerald-50/20 border-emerald-300 hover:border-emerald-400'
+                                : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
+                          }`}
                         >
                           {isSelected && (
                             <div className="absolute top-0 left-0 bottom-0 w-1 bg-[#F89020]" />
                           )}
                           <div className="flex justify-between items-start gap-2">
                             <div className="min-w-0 flex-1 pr-1">
-                              <h4 className="font-mono text-xs text-orange-700 font-bold">BKG-{b.id || (b._id ? String(b._id).slice(0, 8) : '')}</h4>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <h4 className="font-mono text-xs text-orange-700 font-bold">BKG-{b.id || (b._id ? String(b._id).slice(0, 8) : '')}</h4>
+                                {b._proximityBadge && (
+                                  <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded border font-mono shadow-2xs shrink-0 ${b._proximityBadge.className}`}>
+                                    {b._proximityBadge.shortText}
+                                  </span>
+                                )}
+                              </div>
                               <h4 className="font-bold text-slate-900 text-sm mt-0.5 truncate" title={b.transporterName}>{b.transporterName}</h4>
                               <p className="text-xs text-slate-600 mt-1 font-mono truncate" title={b.cargoTitle}>
                                 {b.cargoTitle}{b.cargo?.weight ? `, ${formatWeightTons(b.cargo.weight)}` : ''}
                               </p>
-                              <p className="text-xs text-slate-500 mt-1 font-mono">Truck: {b.truckPlate}</p>
+                              <p className="text-xs text-slate-500 mt-1 font-mono">Truck: {b.truckPlate} &bull; Origin: {b.cargo?.origin || 'Lahore'}</p>
                             </div>
                             <span className={`shrink-0 whitespace-nowrap px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${getStatusBadgeStyle(b.status)}`}>
                               {b.status}
@@ -919,8 +977,9 @@ export default function TruckOwnerDashboard() {
                           </div>
                           <div className="bg-slate-50 p-3 rounded-xl border border-slate-200">
                             <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Route</p>
-                            <p className="text-sm font-semibold text-slate-900 mt-0.5">
-                              {selectedBooking.cargo?.origin || 'Origin'} &rarr; {selectedBooking.cargo?.destination || 'Destination'}
+                            <p className="text-sm font-semibold text-slate-900 mt-0.5 flex items-center gap-1.5">
+                              <GpsMapPin size={12} className="shrink-0" />
+                              <span>{selectedBooking.cargo?.origin || 'Origin'} &rarr; {selectedBooking.cargo?.destination || 'Destination'}</span>
                             </p>
                           </div>
                           {selectedBooking.eta && (
@@ -952,19 +1011,144 @@ export default function TruckOwnerDashboard() {
                       {/* Progress action controls */}
                       <div className="border-t border-slate-200 pt-6 space-y-4">
                         {selectedBooking.status === 'Pending' ? (
-                          <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3">
-                            <button
-                              onClick={() => handleBookingResponse(selectedBooking._id || selectedBooking.id, true)}
-                              className="flex-1 btn-primary text-white font-bold py-3 rounded-xl text-sm shadow-xs"
-                            >
-                              {isUrdu ? 'بکنگ قبول کریں' : 'Accept Booking'}
-                            </button>
-                            <button
-                              onClick={() => handleBookingResponse(selectedBooking._id || selectedBooking.id, false)}
-                              className="flex-1 btn-outline text-rose-700 font-bold py-3 rounded-xl text-sm"
-                            >
-                              {isUrdu ? 'مسترد کریں' : 'Reject'}
-                            </button>
+                          <div className="space-y-3">
+                            {showDriverBargaining ? (
+                              <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-2xl border-2 border-orange-400 dark:border-orange-500/60 space-y-3">
+                                <div className="flex justify-between items-center">
+                                  <div className="flex items-center gap-2">
+                                    <TrendingUp size={18} className="text-[#EA580C]" />
+                                    <h4 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                                      {isUrdu ? 'کرایہ بڑھائیں (جوائنٹ کاؤنٹر پیشکش):' : 'Propose Higher Fare (Counter-Offer):'}
+                                    </h4>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowDriverBargaining(false)}
+                                    className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                                  >
+                                    <X size={16} />
+                                  </button>
+                                </div>
+
+                                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                  {isUrdu ? 'ٹرانسپورٹر کی پیشکش:' : 'Transporter Offered:'} <strong className="text-slate-800 dark:text-slate-200 font-mono">Rs. {selectedBooking.price}</strong>
+                                </p>
+
+                                {/* Quick Increments */}
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="text-[10px] font-bold text-slate-500 uppercase">{isUrdu ? 'تیز اضافہ:' : 'Quick Add:'}</span>
+                                  {[2000, 5000, 10000].map((inc) => (
+                                    <button
+                                      key={inc}
+                                      type="button"
+                                      onClick={() => {
+                                        const base = parseFloat(selectedBooking.price) || 50000;
+                                        setDriverCounterFare(String(base + inc));
+                                      }}
+                                      className="px-2.5 py-1 text-xs font-mono font-bold rounded-lg bg-orange-100 dark:bg-orange-950/60 text-orange-800 dark:text-orange-200 border border-orange-300 dark:border-orange-600/40 hover:bg-orange-200 cursor-pointer"
+                                    >
+                                      +{inc.toLocaleString()}
+                                    </button>
+                                  ))}
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-center">
+                                  <div className="sm:col-span-6 relative">
+                                    <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-orange-600 font-bold font-mono text-xs">
+                                      Rs.
+                                    </span>
+                                    <input
+                                      type="number"
+                                      min="1000"
+                                      step="500"
+                                      value={driverCounterFare}
+                                      onChange={(e) => setDriverCounterFare(e.target.value)}
+                                      placeholder="e.g. 85000"
+                                      className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono font-bold text-sm outline-none focus:border-orange-500"
+                                    />
+                                  </div>
+                                  <div className="sm:col-span-6">
+                                    <input
+                                      type="text"
+                                      value={driverCounterNote}
+                                      onChange={(e) => setDriverCounterNote(e.target.value)}
+                                      placeholder={isUrdu ? 'وجہ (مثلاً ڈیزل اضافہ / یکطرفہ خالی واپسی)' : 'Reason (e.g. diesel hike / empty return)'}
+                                      className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs outline-none focus:border-orange-500"
+                                    />
+                                  </div>
+                                </div>
+
+                                <div className="flex gap-2">
+                                  <button
+                                    type="button"
+                                    disabled={isBargainingSubmitting}
+                                    onClick={() => handleDriverSendCounterOffer(selectedBooking._id || selectedBooking.id)}
+                                    className="flex-1 btn-primary text-xs font-bold py-2.5 rounded-xl flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+                                  >
+                                    {isBargainingSubmitting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                                    <span>{isUrdu ? 'کاؤنٹر آفر بھیجیں' : 'Send Counter-Offer to Transporter'}</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowDriverBargaining(false)}
+                                    className="btn-outline text-xs font-bold px-4 py-2.5 rounded-xl cursor-pointer"
+                                  >
+                                    {isUrdu ? 'منسوخ' : 'Cancel'}
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3">
+                                <button
+                                  onClick={() => handleBookingResponse(selectedBooking._id || selectedBooking.id, true)}
+                                  className="flex-1 btn-primary text-white font-bold py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                                >
+                                  <CheckCircle size={16} />
+                                  <span>{isUrdu ? 'ٹھیک ہے / کرایہ قبول کریں' : 'Accept Fare'} (Rs. {selectedBooking.price})</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setShowDriverBargaining(true);
+                                    const base = parseFloat(selectedBooking.price) || 50000;
+                                    setDriverCounterFare(String(base + 5000));
+                                    setDriverCounterNote('');
+                                  }}
+                                  className="flex-1 btn-outline border-orange-400 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-950/30 font-bold py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                                >
+                                  <TrendingUp size={16} className="text-orange-600" />
+                                  <span>{isUrdu ? 'کرایہ بڑھائیں (Bargain)' : 'Increase Fare / Counter'}</span>
+                                </button>
+                                <button
+                                  onClick={() => handleBookingResponse(selectedBooking._id || selectedBooking.id, false)}
+                                  className="btn-outline text-rose-700 hover:bg-rose-50 font-bold py-2.5 sm:py-3 px-4 rounded-xl text-xs sm:text-sm cursor-pointer"
+                                >
+                                  {isUrdu ? 'مسترد کریں' : 'Reject'}
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        ) : selectedBooking.status === 'Counter-Offered' ? (
+                          <div className="bg-amber-50 dark:bg-amber-950/40 border-2 border-orange-400 dark:border-orange-500/50 p-4 rounded-2xl space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Clock size={18} className="text-orange-600 animate-pulse" />
+                                <h4 className="text-xs font-bold text-orange-950 dark:text-orange-200 uppercase tracking-wider">
+                                  {isUrdu ? 'کاؤنٹر آفر بھیج دی گئی ہے' : 'Counter-Offer Sent!'}
+                                </h4>
+                              </div>
+                              <span className="font-mono font-black text-orange-600 dark:text-orange-400 text-base">
+                                Rs. {selectedBooking.counterPrice}
+                              </span>
+                            </div>
+                            <p className="text-xs text-orange-800 dark:text-orange-300">
+                              {isUrdu ? 'ٹرانسپورٹر کے قبول کرنے یا جوابی پیشکش کا انتظار ہے۔' : 'Waiting for Transporter to accept your proposed fare.'}
+                            </p>
+                            {selectedBooking.counterNote && (
+                              <p className="text-[11px] text-slate-600 dark:text-slate-400 italic bg-white/70 dark:bg-slate-900/50 p-2 rounded-lg">
+                                💬 "{selectedBooking.counterNote}"
+                              </p>
+                            )}
                           </div>
                         ) : (
                           <div className="space-y-4">
@@ -1084,7 +1268,10 @@ export default function TruckOwnerDashboard() {
                               {b.cargoTitle}{b.cargo?.weight ? `, ${formatWeightTons(b.cargo.weight)}` : ''}
                             </td>
                             <td className="p-3 text-slate-700">
-                              {b.cargo?.origin || '—'} &rarr; {b.cargo?.destination || '—'}
+                              <span className="flex items-center gap-1.5">
+                                <GpsMapPin size={11} className="shrink-0" />
+                                <span>{b.cargo?.origin || '—'} &rarr; {b.cargo?.destination || '—'}</span>
+                              </span>
                             </td>
                             <td className="p-3 font-mono text-slate-600 font-bold">{b.truckPlate}</td>
                             <td className="p-3 text-slate-500 font-mono text-xs">
@@ -1240,18 +1427,18 @@ export default function TruckOwnerDashboard() {
       {/* Add Truck Modal */}
       {showAddModal && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 px-2.5 sm:px-4 py-4"
+          className="fixed inset-0 z-[1100] flex items-center justify-center bg-slate-950/80 px-2.5 sm:px-4 py-4 backdrop-blur-xs"
           onClick={(e) => e.target === e.currentTarget && setShowAddModal(false)}
         >
-          <div className="bg-white w-full max-w-md max-h-[calc(100dvh-1.5rem)] overflow-y-auto relative p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-xl modal-enter">
+          <div className="bg-white dark:bg-[#0B1325]/98 text-slate-900 dark:text-slate-100 w-full max-w-md max-h-[calc(100dvh-1.5rem)] overflow-y-auto relative p-4 sm:p-6 rounded-2xl border border-slate-200 dark:border-white/15 shadow-2xl modal-enter">
 
-            <button onClick={() => setShowAddModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 cursor-pointer">
+            <button onClick={() => setShowAddModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer">
               <X size={20} />
             </button>
             <div className="flex items-center gap-2 mb-1 mt-1 text-left">
-              <span className="text-[10px] font-bold text-orange-700 uppercase tracking-wider">Fleet Registration</span>
+              <span className="text-[10px] font-bold text-orange-700 dark:text-orange-400 uppercase tracking-wider">Fleet Registration</span>
             </div>
-            <h2 className="text-xl font-bold text-slate-900 mb-6 text-left">{isUrdu ? 'نئی گاڑی رجسٹر کریں' : 'Register Vehicle'}</h2>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6 text-left">{isUrdu ? 'نئی گاڑی رجسٹر کریں' : 'Register Vehicle'}</h2>
             <form onSubmit={handleAddTruckSubmit} className="space-y-4 text-left">
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
@@ -1407,15 +1594,15 @@ export default function TruckOwnerDashboard() {
       {/* Edit Truck Modal */}
       {editTruckData && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 px-2.5 sm:px-4 py-4"
+          className="fixed inset-0 z-[1100] flex items-center justify-center bg-slate-950/80 px-2.5 sm:px-4 py-4 backdrop-blur-xs"
           onClick={(e) => e.target === e.currentTarget && setEditTruckData(null)}
         >
-          <div className="bg-white w-full max-w-md max-h-[calc(100dvh-1.5rem)] overflow-y-auto relative p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-xl modal-enter">
+          <div className="bg-white dark:bg-[#0B1325]/98 text-slate-900 dark:text-slate-100 w-full max-w-md max-h-[calc(100dvh-1.5rem)] overflow-y-auto relative p-4 sm:p-6 rounded-2xl border border-slate-200 dark:border-white/15 shadow-2xl modal-enter">
 
-            <button onClick={() => setEditTruckData(null)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 cursor-pointer">
+            <button onClick={() => setEditTruckData(null)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer">
               <X size={20} />
             </button>
-            <h2 className="text-xl font-bold text-slate-900 mb-6 mt-1 text-left">{isUrdu ? 'گاڑی کی تفصیلات تبدیل کریں' : 'Edit Truck Details'}</h2>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6 mt-1 text-left">{isUrdu ? 'گاڑی کی تفصیلات تبدیل کریں' : 'Edit Truck Details'}</h2>
             <form onSubmit={handleEditTruckSubmit} className="space-y-4 text-left">
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
@@ -1510,18 +1697,18 @@ export default function TruckOwnerDashboard() {
       {/* Update Documents Modal */}
       {showDocsModal && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 px-2.5 sm:px-4 py-4"
+          className="fixed inset-0 z-[1100] flex items-center justify-center bg-slate-950/80 px-2.5 sm:px-4 py-4 backdrop-blur-xs"
           onClick={(e) => e.target === e.currentTarget && setShowDocsModal(null)}
         >
-          <div className="bg-white w-full max-w-sm max-h-[calc(100dvh-1.5rem)] overflow-y-auto relative p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-xl modal-enter">
+          <div className="bg-white dark:bg-[#0B1325]/98 text-slate-900 dark:text-slate-100 w-full max-w-sm max-h-[calc(100dvh-1.5rem)] overflow-y-auto relative p-4 sm:p-6 rounded-2xl border border-slate-200 dark:border-white/15 shadow-2xl modal-enter">
 
-            <button onClick={() => setShowDocsModal(null)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 cursor-pointer">
+            <button onClick={() => setShowDocsModal(null)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer">
               <X size={20} />
             </button>
             <div className="flex items-center gap-2 mb-1 mt-1 text-left">
-              <span className="text-[10px] font-bold text-orange-700 uppercase tracking-wider">Compliance Documents</span>
+              <span className="text-[10px] font-bold text-orange-700 dark:text-orange-400 uppercase tracking-wider">Compliance Documents</span>
             </div>
-            <h2 className="text-xl font-bold text-slate-900 mb-6 text-left">Update Truck Papers</h2>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6 text-left">Update Truck Papers</h2>
             <form onSubmit={handleDocsSubmit} className="space-y-5 text-left">
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Fitness Certificate</label>
@@ -1578,18 +1765,18 @@ export default function TruckOwnerDashboard() {
 
         return (
           <div
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 px-2.5 sm:px-4 py-4"
+            className="fixed inset-0 z-[1100] flex items-center justify-center bg-slate-950/80 px-2.5 sm:px-4 py-4 backdrop-blur-xs"
             onClick={(e) => e.target === e.currentTarget && setCompletingBooking(null)}
           >
-            <div className="bg-white w-full max-w-xl max-h-[calc(100dvh-1.5rem)] overflow-y-auto relative p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-xl modal-enter">
+            <div className="bg-white dark:bg-[#0B1325]/98 text-slate-900 dark:text-slate-100 w-full max-w-xl max-h-[calc(100dvh-1.5rem)] overflow-y-auto relative p-4 sm:p-6 rounded-2xl border border-slate-200 dark:border-white/15 shadow-2xl modal-enter">
 
-              <button onClick={() => setCompletingBooking(null)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 cursor-pointer">
+              <button onClick={() => setCompletingBooking(null)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer">
                 <X size={20} />
               </button>
               <div className="flex items-center gap-2 mb-1 mt-1 text-left">
-                <span className="text-[10px] font-bold text-orange-700 uppercase tracking-wider">Touchscreen e-POD (Electronic Proof of Delivery)</span>
+                <span className="text-[10px] font-bold text-orange-700 dark:text-orange-400 uppercase tracking-wider">Touchscreen e-POD (Electronic Proof of Delivery)</span>
               </div>
-              <h2 className="text-xl font-bold text-slate-900 mb-1 text-left font-sans">{isUrdu ? 'ترسیل مکمل کریں' : 'Confirm Delivery & e-POD'}</h2>
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-1 text-left font-sans">{isUrdu ? 'ترسیل مکمل کریں' : 'Confirm Delivery & e-POD'}</h2>
               <p className="text-xs text-slate-600 mb-4 text-left">Capture consignee physical touchscreen signature, stamped gate pass photo, and verify delivery status.</p>
 
               {recipients.length > 0 && (

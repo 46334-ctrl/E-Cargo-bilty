@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useToast } from '../../contexts/ToastContext';
@@ -6,13 +6,16 @@ import {
   Users, FileText, Activity, AlertTriangle, Check, X, XCircle, Shield, 
   Package, Trash2, CheckCircle, Loader2, ArrowRight, Truck, 
   Mail, Phone, Clock, Eye, AlertCircle, FileCheck, Send, MessageSquare, 
-  MapPin, Calendar, LayoutGrid, Radio
+  Calendar, LayoutGrid, Radio, Handshake, TrendingUp, Coins, Repeat
 } from 'lucide-react';
+import GpsMapPin from '../../components/GpsMapPin';
 import { logisticsAPI, authAPI, adminAPI, socket } from '../../api';
 import BiltyModal from '../../components/BiltyModal';
-import { ChamakRibbon, TruckTaj, UrduMotto, WorkshopBadge, TruckPoetryBanner, TruckLotusArchBadge, TruckMorBadge, NazarBattuBadge } from '../../components/TruckArt';
+import { ChamakRibbon, WorkshopBadge, TruckPoetryBanner, TruckLotusArchBadge, TruckMorBadge } from '../../components/TruckArt';
 import MapViewer from '../../components/MapViewer';
-import { calculateFreightTariff, VEHICLE_MULTIPLIERS, getIntercityDistance, formatFreightPrice, formatWeightTons } from '../../utils/fareCalculator';
+import { calculateFreightTariff, VEHICLE_MULTIPLIERS, getIntercityDistance, formatFreightPrice, formatWeightTons, BARGAIN_QUICK_INCREMENTS } from '../../utils/fareCalculator';
+import { sortByProximity, getProximityBadge, getProximityDistance } from '../../utils/proximity';
+import LostCargoPortal from '../../components/lostCargo/LostCargoPortal';
 import SearchSelect from '../../components/SearchSelect';
 import UnitInput from '../../components/UnitInput';
 import FormField from '../../components/FormField';
@@ -79,6 +82,18 @@ export default function TransporterDashboard() {
   // Bilty modal state
   const [biltyModalBooking, setBiltyModalBooking] = useState(null);
   const chatEndRef = useRef(null);
+
+  // Fare Bargaining state
+  const [bargainingCargoId, setBargainingCargoId] = useState(null);
+  const [transporterCounterFare, setTransporterCounterFare] = useState('');
+  const [transporterCounterNote, setTransporterCounterNote] = useState('');
+
+  // Transporter Proximity Prioritization
+  const userCity = currentUser?.city || userData?.city || 'Lahore';
+
+  const sortedAvailableTrucks = useMemo(() => {
+    return sortByProximity(availableTrucks, userCity, truck => truck.loc || 'Lahore', isUrdu);
+  }, [availableTrucks, userCity, isUrdu]);
 
   useEffect(() => {
     const onUiBack = (e) => {
@@ -169,7 +184,7 @@ export default function TransporterDashboard() {
     }
   }, [bookings]);
 
-  const handleCargoResponse = async (cargoId, status) => {
+  const handleCargoResponse = async (cargoId, status, extra = {}) => {
     if (status === 'Rejected') {
       setRejectingCargoId(cargoId);
       setRejectionReason('');
@@ -178,12 +193,60 @@ export default function TransporterDashboard() {
     if (isSubmittingAction) return;
     setIsSubmittingAction(true);
     try {
-      await logisticsAPI.respondToCargo(cargoId, { status });
-      toast.success('Cargo request accepted! You can now dispatch a truck to it.');
+      await logisticsAPI.respondToCargo(cargoId, { status, ...extra });
+      toast.success(isUrdu ? 'کارگو پیشکش قبول کرلی گئی! اب آپ اس پر ٹرک روانہ کر سکتے ہیں۔' : 'Cargo request accepted! You can now dispatch a truck to it.');
       fetchData();
     } catch (e) {
       console.error(e);
       toast.error(e.response?.data?.message || 'Failed to update cargo status.');
+    } finally {
+      setIsSubmittingAction(false);
+    }
+  };
+
+  const handleSendCounterOffer = async (cargoId) => {
+    const counterAmount = parseFloat(transporterCounterFare);
+    if (!counterAmount || counterAmount <= 0) {
+      toast.error(isUrdu ? 'براہ کرم نیا کرایہ درج کریں' : 'Please specify a valid counter-fare amount');
+      return;
+    }
+    if (isSubmittingAction) return;
+    setIsSubmittingAction(true);
+    try {
+      await logisticsAPI.respondToCargo(cargoId, {
+        status: 'Pending',
+        fareStatus: 'Counter-Offered',
+        counterFare: counterAmount,
+        counterNote: transporterCounterNote || (isUrdu ? 'کرایہ بڑھانے کی تجویز' : 'Fare increase proposal'),
+        counterBy: 'transporter'
+      });
+      toast.success(isUrdu ? `گاہک کو جوابی پیشکش Rs. ${counterAmount.toLocaleString()} بھیج دی گئی!` : `Counter-offer of Rs. ${counterAmount.toLocaleString()} sent to customer!`);
+      setBargainingCargoId(null);
+      setTransporterCounterFare('');
+      setTransporterCounterNote('');
+      fetchData();
+    } catch (e) {
+      console.error(e);
+      toast.error(e.response?.data?.message || 'Failed to send counter-offer.');
+    } finally {
+      setIsSubmittingAction(false);
+    }
+  };
+
+  const handleAcceptDriverCounter = async (booking) => {
+    if (isSubmittingAction) return;
+    setIsSubmittingAction(true);
+    try {
+      await logisticsAPI.updateBooking(booking._id || booking.id, {
+        price: booking.counterPrice,
+        counterPrice: null,
+        status: 'Accepted'
+      });
+      toast.success(isUrdu ? `ڈرائیور کا کرایہ Rs. ${booking.counterPrice} قبول کرلیا گیا!` : `Driver's proposed fare of Rs. ${booking.counterPrice} accepted!`);
+      fetchData();
+    } catch (e) {
+      console.error(e);
+      toast.error('Failed to accept driver counter-offer');
     } finally {
       setIsSubmittingAction(false);
     }
@@ -366,12 +429,11 @@ export default function TransporterDashboard() {
 
       {/* Command Header Panel */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6 relative z-10 rounded-2xl sm:rounded-3xl bg-[#0B1325]/96 border border-white/15 p-4 sm:p-6 shadow-[0_18px_48px_-14px_rgba(0,0,0,0.75)] overflow-hidden">
-        <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-[#EA580C] via-[#F89020] to-cyan-400" />
+        <div className="absolute inset-x-0 top-0 h-[2px] bg-[#EA580C]" />
         <div className="text-left min-w-0 w-full">
           <div className="flex items-center gap-2 mb-2 flex-wrap">
             <TruckMorBadge />
             <span className="text-[11px] font-bold uppercase tracking-wider text-orange-300 bg-orange-500/15 px-2.5 py-0.5 rounded-full border border-orange-400/35">Fleet Operations</span>
-            <NazarBattuBadge />
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-2">
             <span>{isUrdu ? 'کارگو ٹرانسپورٹر ڈیش بورڈ' : 'Cargo Transporter Dashboard'}</span>
@@ -393,6 +455,7 @@ export default function TransporterDashboard() {
             { id: 'requests', name: isUrdu ? 'نئی کارگو درخواستیں' : 'Incoming Requests', badge: pendingRequests.length },
             { id: 'trucks', name: isUrdu ? 'دستیاب گاڑیاں' : 'Available Trucks' },
             { id: 'shipments', name: isUrdu ? 'فعال ترسیلات' : 'Active Shipments' },
+            { id: 'lost_cargo', name: isUrdu ? 'گمشدہ کارگو پورٹل' : 'Lost Cargo Portal' },
             { id: 'history', name: isUrdu ? 'تاریخچہ و ریکارڈ' : 'Delivery History' }
           ].map(tab => (
             <button
@@ -436,7 +499,7 @@ export default function TransporterDashboard() {
                 <div className="flex flex-wrap justify-between items-center gap-2 border-b border-slate-200 pb-3">
                   <div>
                     <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                      <TruckTaj className="text-orange-600 w-4 h-3" />
+                      <FileText size={16} className="text-orange-600 shrink-0" />
                       REQ-{req.id || (req._id ? String(req._id).slice(0, 8) : '')} <span className="font-normal text-sm text-slate-600">from {req.businessOwnerName}</span>
                     </h3>
                   </div>
@@ -478,34 +541,35 @@ export default function TransporterDashboard() {
                         );
                       })()}
 
-                      {/* Calculated Recommended NHA Tariff */}
-                      {(() => {
-                        const reqTariff = calculateFreightTariff({
-                          origin: req.origin,
-                          destination: req.destination,
-                          chargeableTons: parseFloat(req.chargeableWeight || req.weight) || 10,
-                          vehicleType: 'Full Body Truck',
-                          handlingFlags: req.specialHandling || []
-                        });
-                        const total = reqTariff.totalFare || reqTariff.totalFreight || 0;
-                        const tax = reqTariff.taxAmount || reqTariff.salesTax || 0;
-                        const base = reqTariff.baseFreight || reqTariff.baseFare || 0;
-                        return (
-                          <div className="bg-emerald-50 border border-emerald-300 p-2.5 rounded-xl text-left mt-2 flex flex-wrap items-center justify-between gap-2 shadow-xs">
-                            <div className="min-w-0">
-                              <p className="text-[9px] font-black text-emerald-800 uppercase tracking-wider">
-                                Calculated Tariff ({reqTariff.distanceKm || 0} km)
-                              </p>
-                              <p className="text-[10px] text-slate-500 font-mono mt-0.5 break-words">
-                                Base: Rs. {base.toLocaleString()} &bull; Tax: Rs. {tax.toLocaleString()}
-                              </p>
-                            </div>
-                            <span className="text-xs font-black text-emerald-700 font-mono shrink-0">
-                              Rs. {total.toLocaleString()}
-                            </span>
+                      {/* Customer Proposed Offer & Bargaining Display */}
+                      <div className="bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950/40 dark:to-amber-950/30 border-2 border-orange-300 dark:border-orange-500/50 p-3 rounded-xl text-left mt-2 flex flex-wrap items-center justify-between gap-2 shadow-xs">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <Handshake size={14} className="text-[#EA580C] shrink-0" />
+                            <p className="text-[10px] font-black text-orange-900 dark:text-orange-200 uppercase tracking-wider">
+                              {isUrdu ? 'گاہک کی پیشکش (Customer Offer)' : "Customer's Proposed Fare"}
+                            </p>
                           </div>
-                        );
-                      })()}
+                          <p className="text-[10px] text-slate-600 dark:text-slate-300 font-mono mt-0.5">
+                            {req.counterFare && req.counterBy === 'transporter' ? (
+                              <span className="text-amber-700 dark:text-amber-300 font-bold">
+                                {isUrdu ? 'آپ نے جوابی پیشکش دی ہے:' : 'Your Counter-Offer:'} Rs. {Number(req.counterFare).toLocaleString()}
+                              </span>
+                            ) : req.counterBy === 'customer' ? (
+                              <span className="text-orange-700 dark:text-orange-300 font-bold">
+                                {isUrdu ? 'گاہک نے نظرثانی شدہ پیشکش دی ہے' : 'Customer submitted a revised offer'}
+                              </span>
+                            ) : (
+                              isUrdu ? 'پیشکش قبول کریں یا کرایہ بڑھانے کی جوابی پیشکش کریں' : 'Accept offer or propose higher fare to bargain'
+                            )}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="text-base sm:text-lg font-black text-orange-600 dark:text-[#F89020] font-mono">
+                            Rs. {Number(req.totalFare || req.baseFare || 50000).toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -513,7 +577,10 @@ export default function TransporterDashboard() {
                   <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-2">
                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Pickup Point</p>
                     <div className="space-y-1 mt-2 text-xs text-slate-700">
-                      <p className="font-bold text-slate-900 text-sm">{req.origin}</p>
+                      <p className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                        <GpsMapPin size={12} className="shrink-0" />
+                        <span>{req.origin}</span>
+                      </p>
                       <p><span className="text-slate-500">Address:</span> {reqPickup.address || 'Not specified'}</p>
                       <p><span className="text-slate-500">Landmark:</span> {reqPickup.landmark || '—'}</p>
                       <p><span className="text-slate-500">Contact:</span> {reqPickup.contactName || reqPickup.contact || 'Shipper Contact'} {reqPickup.phone || reqPickup.contactPhone ? `(${reqPickup.phone || reqPickup.contactPhone})` : ''}</p>
@@ -524,7 +591,10 @@ export default function TransporterDashboard() {
                   <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-2">
                     <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Recipients</p>
                     <div className="space-y-1 mt-2 text-xs text-slate-700">
-                      <p className="font-bold text-slate-900 text-sm">{req.destination}</p>
+                      <p className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                        <GpsMapPin size={12} className="shrink-0" />
+                        <span>{req.destination}</span>
+                      </p>
                       {reqRecipients.map((r, idx) => (
                         <div key={idx} className="mt-1">
                           <p><span className="text-slate-500">To:</span> {r.name || r.fullName} ({r.phone})</p>
@@ -536,21 +606,120 @@ export default function TransporterDashboard() {
                   </div>
                 </div>
 
-                {/* Accept/Reject triggers */}
-                <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-4 pt-2">
-                  <button 
-                    onClick={() => handleCargoResponse(req._id || req.id, 'Accepted')}
-                    className="flex-1 btn-primary text-sm font-bold py-2.5 rounded-xl cursor-pointer flex items-center justify-center gap-2 shadow-md"
-                  >
-                    <CheckCircle size={16} /> {isUrdu ? 'درخواست قبول کریں' : 'Accept Request'}
-                  </button>
-                  <button 
-                    onClick={() => handleCargoResponse(req._id || req.id, 'Rejected')}
-                    className="flex-1 btn-outline text-sm font-bold py-2.5 rounded-xl cursor-pointer flex items-center justify-center gap-2"
-                  >
-                    <XCircle size={16} className="shrink-0" /> {isUrdu ? 'مسترد کریں' : 'Reject Request'}
-                  </button>
-                </div>
+                {/* Direct Bargaining Actions */}
+                {bargainingCargoId === (req._id || req.id) ? (
+                  <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-xl border-2 border-orange-400 dark:border-orange-500/60 space-y-3 pt-3">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-2">
+                        <TrendingUp size={16} className="text-[#EA580C]" />
+                        <span className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                          {isUrdu ? 'کرایہ بڑھائیں (جوائنٹ کاؤنٹر پیشکش):' : 'Propose Higher Fare (Counter-Offer):'}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setBargainingCargoId(null)}
+                        className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+
+                    {/* Quick Increments */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase">
+                        {isUrdu ? 'تیز اضافہ:' : 'Quick Add:'}
+                      </span>
+                      {[2000, 5000, 10000, 15000].map((inc) => (
+                        <button
+                          key={inc}
+                          type="button"
+                          onClick={() => {
+                            const base = parseFloat(req.totalFare || req.baseFare || 50000);
+                            setTransporterCounterFare(String(base + inc));
+                          }}
+                          className="px-2.5 py-1 text-xs font-mono font-bold rounded-lg bg-orange-100 dark:bg-orange-950/60 text-orange-800 dark:text-orange-200 border border-orange-300 dark:border-orange-600/40 hover:bg-orange-200 cursor-pointer"
+                        >
+                          +{inc.toLocaleString()}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-center">
+                      <div className="sm:col-span-6 relative">
+                        <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-orange-600 font-bold font-mono text-xs">
+                          Rs.
+                        </span>
+                        <input
+                          type="number"
+                          min="1000"
+                          step="500"
+                          value={transporterCounterFare}
+                          onChange={(e) => setTransporterCounterFare(e.target.value)}
+                          placeholder="e.g. 85000"
+                          className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono font-bold text-sm outline-none focus:border-orange-500"
+                        />
+                      </div>
+                      <div className="sm:col-span-6">
+                        <input
+                          type="text"
+                          value={transporterCounterNote}
+                          onChange={(e) => setTransporterCounterNote(e.target.value)}
+                          placeholder={isUrdu ? 'وجہ درج کریں (مثلاً ڈیزل ریٹ / پہاڑی راستہ)' : 'Reason (e.g. diesel hike / heavy load)'}
+                          className="w-full px-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs outline-none focus:border-orange-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        disabled={isSubmittingAction}
+                        onClick={() => handleSendCounterOffer(req._id || req.id)}
+                        className="flex-1 btn-primary text-xs font-bold py-2.5 rounded-xl flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+                      >
+                        {isSubmittingAction ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                        <span>{isUrdu ? 'گاہک کو کاؤنٹر آفر بھیجیں' : 'Send Counter-Offer to Customer'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBargainingCargoId(null)}
+                        className="btn-outline text-xs font-bold px-4 py-2.5 rounded-xl cursor-pointer"
+                      >
+                        {isUrdu ? 'منسوخ' : 'Cancel'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-2">
+                    <button 
+                      onClick={() => handleCargoResponse(req._id || req.id, 'Accepted', { fareStatus: 'Agreed' })}
+                      className="flex-1 btn-primary text-xs sm:text-sm font-bold py-2.5 rounded-xl cursor-pointer flex items-center justify-center gap-2 shadow-md"
+                    >
+                      <CheckCircle size={16} />
+                      <span>{isUrdu ? 'ٹھیک ہے / پیشکش قبول کریں' : 'Accept Customer Offer'} (Rs. {Number(req.totalFare || req.baseFare || 0).toLocaleString()})</span>
+                    </button>
+                    <button 
+                      onClick={() => {
+                        setBargainingCargoId(req._id || req.id);
+                        const currentFare = parseFloat(req.totalFare || req.baseFare || 50000);
+                        setTransporterCounterFare(String(currentFare + 5000));
+                        setTransporterCounterNote('');
+                      }}
+                      className="flex-1 btn-outline border-orange-400 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-950/30 text-xs sm:text-sm font-bold py-2.5 rounded-xl cursor-pointer flex items-center justify-center gap-2 shadow-2xs"
+                    >
+                      <TrendingUp size={16} className="text-orange-600" />
+                      <span>{isUrdu ? 'کرایہ بڑھائیں (Bargain)' : 'Increase Fare / Counter'}</span>
+                    </button>
+                    <button 
+                      onClick={() => handleCargoResponse(req._id || req.id, 'Rejected')}
+                      className="btn-outline text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-xs sm:text-sm font-bold py-2.5 px-3 rounded-xl cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <XCircle size={15} />
+                      <span>{isUrdu ? 'مسترد کریں' : 'Reject'}</span>
+                    </button>
+                  </div>
+                )}
               </div>
               );
             })}
@@ -573,7 +742,9 @@ export default function TransporterDashboard() {
                   {isUrdu ? 'دستیاب گاڑیوں کی ڈائریکٹری' : 'Available Trucks Directory'}
                 </h3>
                 <p className="text-xs text-slate-500 font-medium mt-0.5">
-                  {isUrdu ? 'گاڑیاں تلاش کریں اور فوری طور پر کارگو کے لیے مقرر کریں' : 'Locate verified fleet carriers and dispatch them directly to accepted cargo.'}
+                  {isUrdu 
+                    ? `آپ کے ڈپو / شہر (${userCity}) کے قریب ترین ٹرک سب سے اوپر دکھائے جا رہے ہیں` 
+                    : `Fleet carriers closest to your hub (${userCity}) are prioritized at the top`}
                 </p>
               </div>
 
@@ -603,7 +774,6 @@ export default function TransporterDashboard() {
                     <span>{isUrdu ? 'لائیو ریڈار نقشہ' : 'Live Fleet Radar'}</span>
                   </button>
                 </div>
-                <UrduMotto />
               </div>
             </div>
 
@@ -611,7 +781,6 @@ export default function TransporterDashboard() {
             <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs text-left relative z-20">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-3">
                 <div className="flex items-center gap-2">
-                  <TruckTaj className="text-orange-600 w-4 h-3" />
                   <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider font-mono">
                     ⚡ Live Inter-City Freight Tariff Estimator
                   </h4>
@@ -695,7 +864,7 @@ export default function TransporterDashboard() {
                   </div>
 
                   <MapViewer 
-                    trucks={availableTrucks}
+                    trucks={sortedAvailableTrucks}
                     onAssignTruck={(truck) => openAssignModalForTruck(truck)}
                     height="500px"
                     zoom={6}
@@ -704,20 +873,28 @@ export default function TransporterDashboard() {
 
                 {/* Fleet Quick Selection Strip */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                  {availableTrucks.map(truck => (
+                  {sortedAvailableTrucks.map(truck => (
                     <div 
                       key={truck._id || truck.id}
                       onClick={() => openAssignModalForTruck(truck)}
-                      className="bg-white border border-slate-200 rounded-xl p-3 text-left hover:border-orange-400 transition-all cursor-pointer shadow-2xs hover:shadow-xs flex items-center justify-between group"
+                      className={`bg-white border rounded-xl p-3 text-left transition-all cursor-pointer shadow-2xs hover:shadow-xs flex items-center justify-between group ${
+                        truck._proximityDistance === 0 ? 'border-emerald-300 hover:border-emerald-500' : 'border-slate-200 hover:border-orange-400'
+                      }`}
                     >
-                      <div>
-                        <p className="font-mono font-bold text-xs text-slate-900 group-hover:text-orange-700 transition-colors">{truck.plateNumber}</p>
-                        <p className="text-[10px] text-slate-500 flex items-center gap-1 mt-0.5">
-                          <MapPin size={10} className="text-orange-500 shrink-0" /> {truck.loc}
+                      <div className="min-w-0 flex-1 pr-2">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="font-mono font-bold text-xs text-slate-900 group-hover:text-orange-700 transition-colors truncate">{truck.plateNumber}</p>
+                          {truck._proximityDistance === 0 && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 font-mono">Local</span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-slate-500 flex items-center gap-1.5 mt-0.5 truncate">
+                          <GpsMapPin size={10} className="shrink-0" />
+                          <span>{truck.loc} &bull; {truck._proximityBadge?.shortText}</span>
                         </p>
                       </div>
-                      <div className="text-right">
-                        <span className="text-[9px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-300">
+                      <div className="text-right shrink-0">
+                        <span className="text-[9px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-300 font-mono">
                           {truck.capacity}
                         </span>
                         <p className="text-[9px] text-slate-400 mt-0.5 capitalize">{truck.truckType || 'Heavy'}</p>
@@ -729,39 +906,54 @@ export default function TransporterDashboard() {
             ) : (
               /* Grid Cards View */
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {availableTrucks.map(truck => (
-                  <div key={truck._id} className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 text-left flex flex-col justify-between min-h-[260px] h-full shadow-xs hover:border-orange-300 hover:shadow-md transition-all duration-300 relative overflow-hidden group">
-                    <div>
-                      <div className="flex justify-between items-start gap-2">
-                        <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-200 text-orange-700 flex items-center justify-center group-hover:scale-105 transition-transform shadow-2xs shrink-0">
-                          <Truck size={20} />
+                {sortedAvailableTrucks.map(truck => {
+                  const isLocal = truck._proximityDistance === 0;
+                  return (
+                    <div key={truck._id} className={`bg-white border rounded-2xl p-4 sm:p-5 text-left flex flex-col justify-between min-h-[260px] h-full shadow-xs transition-all duration-300 relative overflow-hidden group ${
+                      isLocal 
+                        ? 'border-emerald-300 ring-1 ring-emerald-400/20 hover:border-emerald-400 hover:shadow-md' 
+                        : 'border-slate-200 hover:border-orange-300 hover:shadow-md'
+                    }`}>
+                      <div>
+                        <div className="flex justify-between items-start gap-2 flex-wrap">
+                          <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-200 text-orange-700 flex items-center justify-center group-hover:scale-105 transition-transform shadow-2xs shrink-0">
+                            <Truck size={20} />
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {truck._proximityBadge && (
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border font-mono shadow-2xs shrink-0 ${truck._proximityBadge.className}`}>
+                                {truck._proximityBadge.text}
+                              </span>
+                            )}
+                            <span className="bg-emerald-50 text-emerald-800 border border-emerald-300 text-[10px] font-bold tracking-wider uppercase px-2.5 py-0.5 rounded-md font-mono shadow-2xs shrink-0">
+                              Available
+                            </span>
+                          </div>
                         </div>
-                        <span className="bg-emerald-50 text-emerald-800 border border-emerald-300 text-[10px] font-bold tracking-wider uppercase px-2.5 py-0.5 rounded-md font-mono shadow-2xs shrink-0">
-                          Available
-                        </span>
+
+                        <h4 className="text-xl font-bold text-slate-900 mt-4 font-mono break-words">{truck.plateNumber}</h4>
+                        <p className="text-xs text-orange-700 font-semibold mt-1">{truck.truckType} &middot; {truck.capacity}</p>
+
+                        <div className="mt-4 space-y-1 text-xs text-slate-700">
+                          <p><span className="text-slate-500">Owner:</span> <span className="text-slate-900 font-bold">{truck.ownerName || 'Verified Fleet Owner'}</span></p>
+                          <p><span className="text-slate-500">Driver:</span> <span className="text-slate-900 font-bold">{truck.driverName}</span> <span className="text-slate-500 font-mono">({truck.driverMobile})</span></p>
+                          <p className="flex items-center gap-1.5 mt-2 text-slate-600 font-medium">
+                            <GpsMapPin size={12} className="shrink-0" />
+                            <span>Depot: <strong className="text-slate-900">{truck.loc}</strong> &middot; {truck._proximityBadge?.shortText}</span>
+                          </p>
+                        </div>
                       </div>
 
-                      <h4 className="text-xl font-bold text-slate-900 mt-4 font-mono break-words">{truck.plateNumber}</h4>
-                      <p className="text-xs text-orange-700 font-semibold mt-1">{truck.truckType} &middot; {truck.capacity}</p>
-
-                      <div className="mt-4 space-y-1 text-xs text-slate-700">
-                        <p><span className="text-slate-500">Owner:</span> <span className="text-slate-900 font-bold">{truck.ownerName}</span></p>
-                        <p><span className="text-slate-500">Driver:</span> <span className="text-slate-900 font-bold">{truck.driverName}</span> <span className="text-slate-500 font-mono">({truck.driverMobile})</span></p>
-                        <p className="flex items-center gap-1 mt-2 text-slate-600 font-medium">
-                          <MapPin size={12} className="text-slate-500 shrink-0" /> {truck.loc}
-                        </p>
-                      </div>
+                      <button 
+                        onClick={() => openAssignModalForTruck(truck)}
+                        className="w-full btn-primary font-bold py-2.5 rounded-xl text-xs transition-all cursor-pointer mt-4 shadow-xs"
+                      >
+                        {isUrdu ? 'گاڑی مقرر کریں' : 'Assign to Shipment'}
+                      </button>
                     </div>
-
-                    <button 
-                      onClick={() => openAssignModalForTruck(truck)}
-                      className="w-full btn-primary font-bold py-2.5 rounded-xl text-xs transition-all cursor-pointer mt-4 shadow-xs"
-                    >
-                      {isUrdu ? 'گاڑی مقرر کریں' : 'Assign to Shipment'}
-                    </button>
-                  </div>
-                ))}
-                {availableTrucks.length === 0 && (
+                  );
+                })}
+                {sortedAvailableTrucks.length === 0 && (
                   <div className="col-span-full bg-white border border-slate-200 rounded-2xl text-center py-16 px-4 text-slate-600 shadow-xs">
                     No available trucks found. Register or clear trips to free vehicles.
                   </div>
@@ -879,6 +1071,42 @@ export default function TransporterDashboard() {
                         })()}
                       </div>
 
+                      {/* Driver Counter-Offer Alert & Accept Action */}
+                      {selectedBooking.status === 'Counter-Offered' && (
+                        <div className="bg-amber-50 dark:bg-amber-950/40 border-2 border-orange-400 dark:border-orange-500/50 p-4 rounded-xl space-y-3 mt-4 text-left shadow-sm">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <TrendingUp size={18} className="text-orange-600 animate-pulse shrink-0" />
+                              <div>
+                                <h4 className="text-xs font-bold text-orange-950 dark:text-orange-200 uppercase tracking-wider">
+                                  {isUrdu ? 'ڈرائیور کی جوابی پیشکش (Counter-Offer)' : 'Truck Owner Counter-Offered Higher Fare!'}
+                                </h4>
+                                <p className="text-[11px] text-orange-800 dark:text-orange-300">
+                                  {isUrdu ? 'ڈرائیور نے یہ کرایہ طلب کیا ہے:' : 'Driver requested this revised fare:'}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-xs text-slate-400 line-through mr-1 font-mono">Rs. {selectedBooking.price}</span>
+                              <span className="text-lg font-black text-orange-600 dark:text-orange-400 font-mono">Rs. {selectedBooking.counterPrice}</span>
+                            </div>
+                          </div>
+                          {selectedBooking.counterNote && (
+                            <p className="text-xs text-slate-700 dark:text-slate-300 italic bg-white/80 dark:bg-slate-900/60 p-2 rounded-lg border border-orange-200 dark:border-orange-900/30">
+                              💬 "{selectedBooking.counterNote}"
+                            </p>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleAcceptDriverCounter(selectedBooking)}
+                            className="w-full btn-primary text-white text-xs font-bold py-2.5 rounded-xl flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+                          >
+                            <CheckCircle size={15} />
+                            <span>{isUrdu ? 'ٹھیک ہے / ڈرائیور کا کرایہ قبول کریں' : "Accept Driver's Fare"} (Rs. {selectedBooking.counterPrice})</span>
+                          </button>
+                        </div>
+                      )}
+
                       {/* PDF download */}
                       <button 
                         onClick={() => handleBiltyClick(selectedBooking)}
@@ -960,6 +1188,11 @@ export default function TransporterDashboard() {
           </div>
         )}
 
+        {/* LOST CARGO TRACKER & INVESTIGATION TAB */}
+        {activeTab === 'lost_cargo' && (
+          <LostCargoPortal userRole="transporter" currentUserId={userData?.id || currentUser?.id} />
+        )}
+
         {/* HISTORY TAB */}
         {activeTab === 'history' && (
           <div className="space-y-6">
@@ -1032,7 +1265,7 @@ export default function TransporterDashboard() {
       {/* Rejection popup form */}
       {rejectingCargoId && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/78 px-2.5 sm:px-4 py-4"
+          className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/80 backdrop-blur-xs px-2.5 sm:px-4 py-4"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
               setRejectingCargoId(null);
@@ -1040,20 +1273,20 @@ export default function TransporterDashboard() {
             }
           }}
         >
-          <div className="bg-white w-full max-w-md max-h-[calc(100dvh-1.5rem)] overflow-y-auto relative p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-xl modal-enter">
-            <button type="button" aria-label="Close modal" onClick={() => { setRejectingCargoId(null); setRejectionReason(''); }} className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 cursor-pointer">
+          <div className="bg-white dark:bg-[#0B1325]/98 text-slate-900 dark:text-slate-100 w-full max-w-md max-h-[calc(100dvh-1.5rem)] overflow-y-auto relative p-4 sm:p-6 rounded-2xl border border-slate-200 dark:border-white/15 shadow-2xl modal-enter">
+            <button type="button" aria-label="Close modal" onClick={() => { setRejectingCargoId(null); setRejectionReason(''); }} className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer">
               <X size={20} />
             </button>
-            <h2 className="text-xl font-bold text-slate-900 mb-2 mt-1 text-left">Reject Shipment Request</h2>
-            <p className="text-xs text-slate-600 mb-6 text-left">Please provide a mandatory reason for rejecting this corporate shipment request.</p>
+            <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2 mt-1 text-left">Reject Shipment Request</h2>
+            <p className="text-xs text-slate-600 dark:text-slate-300 mb-6 text-left">Please provide a mandatory reason for rejecting this corporate shipment request.</p>
             <form onSubmit={handleConfirmRejection} className="space-y-4 text-left">
               <div>
-                <label className="block text-xs font-bold text-rose-700 uppercase tracking-wider mb-1">Rejection Reason *</label>
+                <label className="block text-xs font-bold text-rose-700 dark:text-rose-400 uppercase tracking-wider mb-1">Rejection Reason *</label>
                 <textarea 
                   required 
                   value={rejectionReason} 
                   onChange={e => setRejectionReason(e.target.value)} 
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 h-24 text-sm outline-none focus:bg-white focus:border-rose-500" 
+                  className="w-full bg-slate-50 dark:bg-white/[0.05] border border-slate-200 dark:border-white/15 rounded-xl px-3.5 py-2.5 text-slate-900 dark:text-white h-24 text-sm outline-none focus:bg-white dark:focus:bg-white/10 focus:border-rose-500" 
                   placeholder="e.g. Schedule conflict or route unavailable. We cannot dispatch vehicles to this route next week." 
                 />
               </div>
@@ -1078,20 +1311,20 @@ export default function TransporterDashboard() {
 
         return (
           <div
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/78 px-2.5 sm:px-4 py-4"
+            className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/80 backdrop-blur-xs px-2.5 sm:px-4 py-4"
             onClick={(e) => e.target === e.currentTarget && setShowAssignModal(false)}
           >
-            <div className="bg-white w-full max-w-lg max-h-[calc(100dvh-1.5rem)] overflow-y-auto relative p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-xl modal-enter">
-              <button type="button" aria-label="Close modal" onClick={() => setShowAssignModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 cursor-pointer">
+            <div className="bg-white dark:bg-[#0B1325]/98 text-slate-900 dark:text-slate-100 w-full max-w-lg max-h-[calc(100dvh-1.5rem)] overflow-y-auto relative p-4 sm:p-6 rounded-2xl border border-slate-200 dark:border-white/15 shadow-2xl modal-enter">
+              <button type="button" aria-label="Close modal" onClick={() => setShowAssignModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer">
                 <X size={20} />
               </button>
               <div className="flex items-center gap-2 mb-1 mt-1 text-left">
-                <TruckTaj className="text-orange-600 w-4 h-3" />
-                <span className="text-[10px] font-bold text-orange-700 uppercase tracking-wider">Fleet Dispatch &amp; Tariff Engine</span>
+                <Truck size={16} className="text-orange-600 shrink-0" />
+                <span className="text-[10px] font-bold text-orange-700 dark:text-orange-400 uppercase tracking-wider">Fleet Dispatch &amp; Freight Offer</span>
               </div>
-              <h2 className="text-xl font-bold text-slate-900 mb-1 text-left">Assign Truck &amp; Calculate Fare</h2>
-              <p className="text-xs text-slate-600 mb-4 text-left">
-                Select route and consignment details to view automated government/NHA freight tariff for vehicle <span className="text-orange-700 font-bold font-mono">{selectedTruckForAssign.plateNumber}</span>.
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-1 text-left">Assign Truck &amp; Set Freight Offer</h2>
+              <p className="text-xs text-slate-600 dark:text-slate-300 mb-4 text-left">
+                Set your freight offer for vehicle <span className="text-orange-700 dark:text-orange-400 font-bold font-mono">{selectedTruckForAssign.plateNumber}</span>. Driver can accept or counter-offer.
               </p>
 
               {/* Truck summary badge */}
@@ -1105,6 +1338,11 @@ export default function TransporterDashboard() {
                   </div>
                   <p className="text-xs text-slate-600 mt-1">
                     Depot: <span className="text-slate-900 font-medium">{selectedTruckForAssign.loc}</span> &bull; Driver: <span className="text-slate-900 font-medium">{selectedTruckForAssign.driverName}</span>
+                    {assignOrigin && (
+                      <span className="ml-2 font-mono text-[11px] font-bold text-orange-700">
+                        ({getProximityDistance(assignOrigin, selectedTruckForAssign.loc) === 0 ? '📍 At Pickup Hub (0 km)' : `📍 ${getProximityDistance(assignOrigin, selectedTruckForAssign.loc)} km to ${assignOrigin}`})
+                      </span>
+                    )}
                   </p>
                 </div>
                 <div className="text-right font-mono">
@@ -1214,69 +1452,55 @@ export default function TransporterDashboard() {
                   </div>
                 </div>
 
-                {/* Live Dynamic Calculated Fare Card */}
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 shadow-2xs">
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-200">
-                    <span className="text-[11px] font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                      <TruckTaj className="w-3.5 h-3 text-orange-600" />
-                      Dynamic Tariff Breakdown
+                {/* Freight Offer & Quick Bargaining Presets */}
+                <div className="bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950/40 dark:to-amber-950/30 border-2 border-orange-300 dark:border-orange-500/50 rounded-xl p-4 shadow-2xs space-y-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-orange-200 dark:border-orange-500/30">
+                    <span className="text-[11px] font-bold text-slate-800 dark:text-slate-100 uppercase tracking-wider flex items-center gap-1.5">
+                      <Handshake size={15} className="text-[#EA580C]" />
+                      {isUrdu ? 'ڈرائیور کو کرایہ کی پیشکش (Bargaining)' : 'Freight Offer for Driver (Direct Bargaining)'}
                     </span>
-                    <span className="text-xs font-mono font-bold text-slate-600">
-                      🛣️ {activeTariff.distanceKm} km (NHA Highway)
+                    <span className="text-xs font-mono font-bold text-orange-700 dark:text-orange-300">
+                      🛣️ {activeTariff.distanceKm} km Route
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 mt-2.5 text-xs">
-                    <div>
-                      <span className="text-[10px] text-slate-500 block">Base Freight</span>
-                      <span className="font-mono font-bold text-slate-800">Rs. {(activeTariff.baseFreight || activeTariff.baseFare || 0).toLocaleString()}</span>
-                      <span className="text-[9px] text-slate-400 block font-mono">@ Rs. 45/Ton-km x {activeTariff.tons || activeTariff.chargeableTons || 1}T</span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-slate-500 block">Fuel Surcharge (8%)</span>
-                      <span className="font-mono font-bold text-slate-800">Rs. {(activeTariff.fuelSurcharge || 0).toLocaleString()}</span>
-                      <span className="text-[9px] text-slate-400 block font-mono">National Diesel Index</span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-slate-500 block">Provincial Tax (16%)</span>
-                      <span className="font-mono font-bold text-slate-800">Rs. {(activeTariff.taxAmount || activeTariff.salesTax || 0).toLocaleString()}</span>
-                      <span className="text-[9px] text-slate-400 block font-mono">PRA / SRB Services</span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-slate-500 block">Vehicle Multiplier</span>
-                      <span className="font-mono font-bold text-slate-800">{activeTariff.vehicleMultiplier || 1}x</span>
-                      <span className="text-[9px] text-slate-400 block font-mono">{activeTariff.vehicleType || 'Standard'}</span>
-                    </div>
-                  </div>
+                  <p className="text-[11px] text-slate-600 dark:text-slate-300">
+                    {isUrdu ? 'ڈرائیور کو پیشکش بھیجیں۔ ڈرائیور اسے قبول کر سکتا ہے یا کرایہ بڑھانے کی جوابی پیشکش کر سکتا ہے۔' : 'Send an offer to the truck driver. Driver can accept ("Theek Hai") or propose a counter-offer.'}
+                  </p>
 
-                  <div className="mt-3 pt-2.5 border-t border-slate-200 flex items-center justify-between">
-                    <div>
-                      <span className="text-[10px] font-bold uppercase text-slate-700 tracking-wider">Calculated Fare:</span>
-                      <p className="text-xl font-bold text-orange-700 font-mono">Rs. {(activeTariff.totalFare || activeTariff.totalFreight || 0).toLocaleString()}</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAssignPrice(activeTariff.totalFare || activeTariff.totalFreight);
-                        if (assignFormErrors.price) {
-                          setAssignFormErrors(prev => {
-                            const copy = { ...prev };
-                            delete copy.price;
-                            return copy;
-                          });
-                        }
-                      }}
-                      className="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-lg shadow-2xs transition-all cursor-pointer flex items-center gap-1"
-                    >
-                      ⚡ Apply Fare
-                    </button>
+                  {/* Quick Presets */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase">{isUrdu ? 'تجویز کردہ:' : 'Presets:'}</span>
+                    {[
+                      Math.max(25000, Math.round((activeTariff.distanceKm * 45) / 5000) * 5000),
+                      Math.max(35000, Math.round((activeTariff.distanceKm * 60) / 5000) * 5000),
+                      Math.max(50000, Math.round((activeTariff.distanceKm * 80) / 5000) * 5000)
+                    ].map((presetVal) => (
+                      <button
+                        key={presetVal}
+                        type="button"
+                        onClick={() => {
+                          setAssignPrice(presetVal);
+                          if (assignFormErrors.price) {
+                            setAssignFormErrors(prev => {
+                              const copy = { ...prev };
+                              delete copy.price;
+                              return copy;
+                            });
+                          }
+                        }}
+                        className="px-2.5 py-1 text-xs font-mono font-bold rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 hover:border-orange-500 hover:text-orange-600 cursor-pointer shadow-2xs"
+                      >
+                        Rs. {presetVal.toLocaleString()}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
                 {/* Agreed Price input */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Agreed / Contract Price (PKR) <span className="text-red-500">*</span>
+                    {isUrdu ? 'ٹرک ڈرائیور کو پیشکش کردہ کرایہ (Rs. PKR) *' : 'Offered Price for Driver (Rs. PKR) *'}
                   </label>
                   <input 
                     type="number"

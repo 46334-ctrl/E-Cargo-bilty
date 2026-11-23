@@ -13,10 +13,12 @@ import { adminAPI, logisticsAPI, socket, resolveAssetUrl } from '../../api';
 
 import { generateBiltyPDF } from '../../utils/generateBiltyPDF';
 import BiltyModal from '../../components/BiltyModal';
-import { ChamakRibbon, TruckTaj, UrduMotto, WorkshopBadge, TruckPoetryBanner, SindhiTruckTexture, TruckPatternBorder, TruckLotusArchBadge, TruckMorBadge, NazarBattuBadge } from '../../components/TruckArt';
+import { ChamakRibbon, WorkshopBadge, TruckPoetryBanner, SindhiTruckTexture, TruckPatternBorder, TruckLotusArchBadge, TruckMorBadge } from '../../components/TruckArt';
 import MapViewer from '../../components/MapViewer';
+import GpsMapPin from '../../components/GpsMapPin';
 import { formatPhone } from '../../utils/validation';
 import { formatWeightTons } from '../../utils/fareCalculator';
+import LostCargoPortal from '../../components/lostCargo/LostCargoPortal';
 
 export default function AdminDashboard() {
   const { userData } = useAuth();
@@ -310,6 +312,7 @@ export default function AdminDashboard() {
     { id: 'approvals', name: 'Pending Approvals', badge: pendingUsers.length },
     { id: 'users', name: 'Users' },
     { id: 'shipments', name: 'Shipments' },
+    { id: 'lost_cargo', name: isUrdu ? 'گمشدہ کارگو پورٹل' : 'Lost Cargo Portal' },
     { id: 'disputes', name: 'Disputes' },
     { id: 'activity', name: 'Activity Log' },
     { id: 'notifications', name: 'Notifications' },
@@ -333,14 +336,13 @@ export default function AdminDashboard() {
 
       {/* Command Header Panel */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6 relative z-10 rounded-2xl sm:rounded-3xl bg-[#0B1325]/96 border border-white/15 p-4 sm:p-6 shadow-[0_18px_48px_-14px_rgba(0,0,0,0.75)] overflow-hidden">
-        <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-[#EA580C] via-[#F89020] to-cyan-400" />
+        <div className="absolute inset-x-0 top-0 h-[2px] bg-[#EA580C]" />
         <div className="text-left min-w-0 w-full">
           <div className="flex items-center gap-2 mb-2 flex-wrap">
             <TruckMorBadge />
             {isUrdu && (
               <span className="text-[11px] font-bold uppercase tracking-widest text-orange-300 bg-orange-500/15 px-2.5 py-0.5 rounded-full border border-orange-400/35 font-urdu">شاہراہِ پاکستان</span>
             )}
-            <NazarBattuBadge />
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-2 flex-wrap">
             <span>{isUrdu ? 'نگرانِ اعلیٰ کنٹرول سینٹر' : 'Admin Control Center'}</span>
@@ -658,7 +660,12 @@ export default function AdminDashboard() {
                               {s.biltyNo && s.biltyNo !== '-' ? s.biltyNo : `SHP-${s.id}`}
                             </button>
                           </td>
-                          <td className="py-4 px-3 font-medium text-slate-900">{s.origin} &rarr; {s.destination}</td>
+                          <td className="py-4 px-3 font-medium text-slate-900">
+                            <span className="flex items-center gap-1.5">
+                              <GpsMapPin size={11} className="shrink-0" />
+                              <span>{s.origin} &rarr; {s.destination}</span>
+                            </span>
+                          </td>
                           <td className="py-4 px-3 text-slate-700">{s.transporterName || 'Unassigned'}</td>
                           <td className="py-4 px-3">
                             <span className={`shrink-0 whitespace-nowrap inline-block px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${getStatusBadgeStyle(s.status)}`}>
@@ -679,11 +686,10 @@ export default function AdminDashboard() {
         {/* PENDING APPROVALS PANEL */}
         {activeTab === 'approvals' && (
           <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h3 className="text-xs font-bold text-slate-700 tracking-wider uppercase text-left font-sans">
+            <div className="flex justify-between items-center mb-1">
+              <h3 className="text-xs font-bold text-slate-700 dark:text-slate-300 tracking-wider uppercase text-left font-sans">
                 {pendingUsers.length} pending verification
               </h3>
-              <UrduMotto text="سفرِ خیر" translation="Safe Journey" />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[450px]">
@@ -1090,7 +1096,12 @@ export default function AdminDashboard() {
                           </td>
                           <td className="py-4 px-3 text-slate-900 font-medium">{s.transporterName || 'Unassigned'}</td>
                           <td className="py-4 px-3 text-slate-700">{s.businessOwnerName || 'Unknown'}</td>
-                          <td className="py-4 px-3 font-medium text-slate-900">{s.origin} &rarr; {s.destination}</td>
+                          <td className="py-4 px-3 font-medium text-slate-900">
+                            <span className="flex items-center gap-1.5">
+                              <GpsMapPin size={11} className="shrink-0" />
+                              <span>{s.origin} &rarr; {s.destination}</span>
+                            </span>
+                          </td>
                           <td className="py-4 px-3 font-mono text-slate-600">{s.truckPlate || '-'}</td>
                           <td className="py-4 px-3 text-slate-700 font-mono">{formatWeightTons(s.weight)}</td>
                           <td className="py-4 px-3">
@@ -1114,6 +1125,11 @@ export default function AdminDashboard() {
             </div>
           );
         })()}
+
+        {/* LOST & MISSING CARGO TRACKING PORTAL */}
+        {activeTab === 'lost_cargo' && (
+          <LostCargoPortal userRole="admin" />
+        )}
 
         {/* DISPUTES / COMPLAINTS PANEL */}
         {activeTab === 'disputes' && (
@@ -1238,23 +1254,23 @@ export default function AdminDashboard() {
           role="dialog"
           aria-modal="true"
           aria-label="User dossier"
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 px-2.5 sm:px-4 py-4 sm:py-8 overflow-y-auto"
+          className="fixed inset-0 z-[1100] flex items-center justify-center bg-slate-950/80 px-2.5 sm:px-4 py-4 sm:py-8 overflow-y-auto"
         >
           <div
             onClick={e => e.stopPropagation()}
-            className="bg-white/95 border border-slate-200 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[calc(100dvh-1.5rem)] overflow-y-auto my-auto relative modal-enter"
+            className="bg-white/95 dark:bg-[#0B1325]/98 border border-slate-200 dark:border-white/15 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[calc(100dvh-1.5rem)] overflow-y-auto my-auto relative modal-enter text-slate-900 dark:text-slate-100"
           >
             {/* Top Chamak Patti decoration */}
             <ChamakRibbon height="h-1.5" />
 
             {/* Modal header */}
-            <div className="flex flex-col sm:flex-row justify-between items-start gap-3 p-4 sm:p-6 border-b border-slate-200">
+            <div className="flex flex-col sm:flex-row justify-between items-start gap-3 p-4 sm:p-6 border-b border-slate-200 dark:border-white/10">
               <div className="text-left min-w-0">
                 <div className="flex items-center gap-2 mb-1">
-                  <TruckTaj className="text-orange-600 w-5 h-4" />
-                  <span className="text-[10px] font-bold text-orange-700 uppercase tracking-wider">User Dossier</span>
+                  <Shield className="text-orange-600 w-4 h-4" />
+                  <span className="text-[10px] font-bold text-orange-700 dark:text-orange-400 uppercase tracking-wider">User Dossier</span>
                 </div>
-                <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 break-words">{viewingUser.name}</h2>
+                <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white break-words">{viewingUser.name}</h2>
                 <p className={`text-xs sm:text-sm font-semibold capitalize mt-1 ${getRoleStyle(viewingUser.role)}`}>
                   {viewingUser.role.replace('_', ' ')} &bull; <span className="font-mono">USR-{viewingUser.id || viewingUser._id}</span>
                 </p>
@@ -1266,7 +1282,7 @@ export default function AdminDashboard() {
                 <button
                   onClick={() => setViewingUser(null)}
                   aria-label="Close user dossier"
-                  className="text-slate-500 hover:text-slate-800 cursor-pointer p-1"
+                  className="text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white cursor-pointer p-1"
                 >
                   <X size={22} />
                 </button>
@@ -1526,27 +1542,27 @@ export default function AdminDashboard() {
           role="dialog"
           aria-modal="true"
           aria-label="WhatsApp notification gateway"
-          className="fixed inset-0 z-[100] flex items-center justify-center p-2.5 sm:p-4 bg-black/80"
+          className="fixed inset-0 z-[1100] flex items-center justify-center p-2.5 sm:p-4 bg-black/80 backdrop-blur-xs"
         >
           <div
             onClick={e => e.stopPropagation()}
-            className="bg-white/95 border border-emerald-300 rounded-2xl w-full max-w-lg max-h-[calc(100dvh-1.5rem)] overflow-y-auto p-4 sm:p-6 relative shadow-2xl modal-enter"
+            className="bg-white/95 dark:bg-[#0B1325]/98 border border-emerald-300 dark:border-emerald-500/40 rounded-2xl w-full max-w-lg max-h-[calc(100dvh-1.5rem)] overflow-y-auto p-4 sm:p-6 relative shadow-2xl modal-enter text-slate-900 dark:text-slate-100"
           >
             <button
               onClick={() => { setWhatsappModalOpen(false); setTestResult(null); }}
               aria-label="Close WhatsApp gateway modal"
-              className="absolute top-3.5 right-3.5 sm:top-4 sm:right-4 text-slate-400 hover:text-slate-700 cursor-pointer p-1"
+              className="absolute top-3.5 right-3.5 sm:top-4 sm:right-4 text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer p-1"
             >
               <X size={20} />
             </button>
 
             <div className="flex items-center gap-3 mb-4 pr-7">
-              <div className="w-10 h-10 rounded-xl bg-emerald-100 border border-emerald-300 flex items-center justify-center text-emerald-700 shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-500/20 border border-emerald-300 dark:border-emerald-500/40 flex items-center justify-center text-emerald-700 dark:text-emerald-300 shrink-0">
                 <MessageSquare size={22} />
               </div>
               <div className="min-w-0">
-                <h3 className="text-base sm:text-lg font-black text-slate-900">WhatsApp Notification Gateway</h3>
-                <p className="text-xs text-slate-600 font-medium">Self-hosted automated alerts for shipments & deliveries</p>
+                <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">WhatsApp Notification Gateway</h3>
+                <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">Self-hosted automated alerts for shipments & deliveries</p>
               </div>
             </div>
 

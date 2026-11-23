@@ -46,6 +46,8 @@ export const HIGHWAY_DISTANCES = {
 
   'islamabad-peshawar': 180,
   'rawalpindi-peshawar': 175,
+  'islamabad-rawalpindi': 15,
+  'rawalpindi-islamabad': 15,
   'islamabad-quetta': 900,
   'rawalpindi-quetta': 890,
   'islamabad-sukkur': 920,
@@ -246,4 +248,37 @@ export const formatWeightTons = (val, unitLabel = 'tons', fallback = '—') => {
   const cleaned = stripWeightUnit(val);
   if (!cleaned) return fallback;
   return `${cleaned} ${unitLabel}`;
+};
+
+/**
+ * Direct Freight Bargaining Helpers & Dynamic Offer Presets
+ */
+export const BARGAIN_QUICK_INCREMENTS = [2000, 5000, 10000, 20000];
+
+export const getQuickIncrements = (fare = 50000) => {
+  const f = Number(fare) || 50000;
+  if (f < 35000) {
+    return [1000, 2000, 5000, 10000];
+  }
+  return [2000, 5000, 10000, 20000];
+};
+
+export const getBargainingPresets = (recommendedFareOrDistance = 50000, weightTons = null) => {
+  let basePrice = 50000;
+  if (weightTons !== null && weightTons !== undefined) {
+    const dist = Number(recommendedFareOrDistance) || 350;
+    const wt = Number(weightTons) || 5;
+    basePrice = Math.max(8000, Math.round(dist * Math.max(0.5, wt) * 45 * 1.24));
+  } else {
+    basePrice = Math.max(5000, Number(recommendedFareOrDistance) || 50000);
+  }
+
+  const step = basePrice > 100000 ? 5000 : basePrice > 30000 ? 2000 : 1000;
+  const p1 = Math.max(3000, Math.round((basePrice * 0.85) / step) * step);
+  const p2 = Math.max(4000, Math.round((basePrice * 0.95) / step) * step);
+  const p3 = Math.round(basePrice / step) * step;
+  const p4 = Math.round((basePrice * 1.10) / step) * step;
+
+  const set = new Set([p1, p2, p3, p4]);
+  return Array.from(set).sort((a, b) => a - b);
 };

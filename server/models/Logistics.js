@@ -110,7 +110,11 @@ const Cargo = sequelize.define('Cargo', {
   baseFare: { type: DataTypes.FLOAT, allowNull: true, field: 'base_fare' },
   fuelSurcharge: { type: DataTypes.FLOAT, allowNull: true, field: 'fuel_surcharge' },
   taxAmount: { type: DataTypes.FLOAT, allowNull: true, field: 'tax_amount' },
-  totalFare: { type: DataTypes.FLOAT, allowNull: true, field: 'total_fare' }
+  totalFare: { type: DataTypes.FLOAT, allowNull: true, field: 'total_fare' },
+  counterFare: { type: DataTypes.FLOAT, allowNull: true, field: 'counter_fare' },
+  counterNote: { type: DataTypes.STRING, allowNull: true, field: 'counter_note' },
+  counterBy: { type: DataTypes.STRING, allowNull: true, field: 'counter_by' },
+  fareStatus: { type: DataTypes.STRING, defaultValue: 'Offered', field: 'fare_status' }
 }, {
   tableName: 'cargo',
   timestamps: true,
@@ -160,6 +164,8 @@ const Booking = sequelize.define('Booking', {
   podPhotoUrl: { type: DataTypes.STRING, allowNull: true, field: 'pod_photo_url' },
   conditionStatus: { type: DataTypes.STRING, defaultValue: 'Good Condition', field: 'condition_status' },
   discrepancyNotes: { type: DataTypes.TEXT, allowNull: true, field: 'discrepancy_notes' },
+  counterPrice: { type: DataTypes.STRING, allowNull: true, field: 'counter_price' },
+  counterNote: { type: DataTypes.STRING, allowNull: true, field: 'counter_note' },
   completedAt: { type: DataTypes.DATE, field: 'completed_at' }
 }, {
   tableName: 'bookings',
@@ -228,6 +234,98 @@ const Complaint = sequelize.define('Complaint', {
   updatedAt: false
 });
 
+// ─── Lost Cargo Report Model ──────────────────────────────────────────────────
+const LostCargoReport = sequelize.define('LostCargoReport', {
+  id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
+  biltyId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    field: 'bilty_id',
+    references: { model: Cargo, key: 'id' }
+  },
+  reportedByUserId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    field: 'reported_by_user_id',
+    references: { model: User, key: 'id' }
+  },
+  transporterId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    field: 'transporter_id',
+    references: { model: User, key: 'id' }
+  },
+  issueType: {
+    type: DataTypes.ENUM('Not Delivered', 'Missing Items', 'Lost in Transit', 'Damaged'),
+    allowNull: false,
+    field: 'issue_type'
+  },
+  description: {
+    type: DataTypes.TEXT,
+    allowNull: false
+  },
+  evidenceImageUrl: {
+    type: DataTypes.STRING(500),
+    allowNull: true,
+    field: 'evidence_image_url'
+  },
+  lastKnownLocation: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    field: 'last_known_location'
+  },
+  status: {
+    type: DataTypes.ENUM('Reported', 'Under Investigation', 'Located', 'Resolved', 'Closed'),
+    defaultValue: 'Reported'
+  },
+  resolutionNotes: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+    field: 'resolution_notes'
+  }
+}, {
+  tableName: 'lost_cargo_reports',
+  timestamps: true,
+  createdAt: 'created_at',
+  updatedAt: 'updated_at'
+});
+
+// ─── Lost Cargo Log / Audit Trail Model ───────────────────────────────────────
+const LostCargoLog = sequelize.define('LostCargoLog', {
+  id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
+  reportId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    field: 'report_id',
+    references: { model: LostCargoReport, key: 'id' }
+  },
+  updatedByUserId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    field: 'updated_by_user_id',
+    references: { model: User, key: 'id' }
+  },
+  role: {
+    type: DataTypes.STRING(50),
+    allowNull: false
+  },
+  actionNote: {
+    type: DataTypes.TEXT,
+    allowNull: false,
+    field: 'action_note'
+  },
+  statusChangedTo: {
+    type: DataTypes.STRING(50),
+    allowNull: true,
+    field: 'status_changed_to'
+  }
+}, {
+  tableName: 'lost_cargo_logs',
+  timestamps: true,
+  createdAt: 'created_at',
+  updatedAt: false
+});
+
 // ─── Associations ──────────────────────────────────────────────────────────────
 User.hasMany(Truck, { foreignKey: 'owner_id' });
 Truck.belongsTo(User, { foreignKey: 'owner_id', as: 'owner' });
@@ -247,4 +345,28 @@ Cargo.hasMany(Booking, { foreignKey: 'cargo_id' });
 User.hasMany(Notification, { foreignKey: 'user_id' });
 User.hasMany(Complaint, { foreignKey: 'user_id' });
 
-module.exports = { Truck, Cargo, Booking, BookingMessage, Notification, Complaint };
+// Lost Cargo Associations
+LostCargoReport.belongsTo(Cargo, { foreignKey: 'bilty_id', as: 'bilty' });
+Cargo.hasMany(LostCargoReport, { foreignKey: 'bilty_id', as: 'lostReports' });
+
+LostCargoReport.belongsTo(User, { foreignKey: 'reported_by_user_id', as: 'reportedBy' });
+User.hasMany(LostCargoReport, { foreignKey: 'reported_by_user_id', as: 'filedLostReports' });
+
+LostCargoReport.belongsTo(User, { foreignKey: 'transporter_id', as: 'transporter' });
+User.hasMany(LostCargoReport, { foreignKey: 'transporter_id', as: 'assignedLostReports' });
+
+LostCargoReport.hasMany(LostCargoLog, { foreignKey: 'report_id', as: 'logs' });
+LostCargoLog.belongsTo(LostCargoReport, { foreignKey: 'report_id' });
+
+LostCargoLog.belongsTo(User, { foreignKey: 'updated_by_user_id', as: 'updater' });
+
+module.exports = { 
+  Truck, 
+  Cargo, 
+  Booking, 
+  BookingMessage, 
+  Notification, 
+  Complaint,
+  LostCargoReport,
+  LostCargoLog
+};

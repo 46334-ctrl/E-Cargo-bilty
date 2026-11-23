@@ -26,9 +26,7 @@ import {
   EyeOff
 } from 'lucide-react';
 import {
-  TruckBackground,
-  UrduMotto,
-  NazarBattuBadge
+  TruckBackground
 } from '../components/TruckArt';
 import {
   DEFAULT_SERVER_IP,
@@ -51,6 +49,8 @@ import {
   validateNTN,
   validateRequired
 } from '../utils/validation';
+import GpsMapPin from '../components/GpsMapPin';
+import { PAKISTAN_CITIES } from '../utils/proximity';
 
 const getPasswordStrength = (pw, isUrdu) => {
   if (!pw) return { score: 0, label: '', color: 'bg-white/10', textColor: 'text-slate-400' };
@@ -94,6 +94,7 @@ export default function Register() {
   const [role, setRole] = useState('business');
   const [cnic, setCnic] = useState('');
   const [phone, setPhone] = useState('');
+  const [city, setCity] = useState('Lahore');
   const [businessName, setBusinessName] = useState('');
   const [businessRegNumber, setBusinessRegNumber] = useState('');
   const [error, setError] = useState('');
@@ -306,6 +307,7 @@ export default function Register() {
         role,
         cnic: formatCNIC(cnic),
         phone: formatPhone(phone),
+        city: city || 'Lahore',
         businessName: requiresBusinessInfo ? businessName.trim() : '',
         businessRegNumber: requiresBusinessInfo ? businessRegNumber.trim() : ''
       });
@@ -384,12 +386,12 @@ export default function Register() {
 
   const getContainerTone = (field) => {
     if (errors[field] && touched[field]) {
-      return 'border-rose-500/80 ring-2 ring-rose-500/20 bg-rose-500/10';
+      return 'border-rose-500/80 ring-2 ring-rose-500/20 bg-rose-50 dark:bg-rose-500/10';
     }
     if (isFieldValid(field)) {
-      return 'border-emerald-500/45 bg-[#0F1930]/85 focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/25';
+      return 'border-emerald-500/45 bg-white dark:bg-[#0F1930]/85 focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/25';
     }
-    return 'border-white/15 bg-[#0F1930]/85 focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/25';
+    return 'border-slate-300 dark:border-white/15 bg-white dark:bg-[#0F1930]/85 focus-within:border-orange-500 focus-within:ring-2 focus-within:ring-orange-500/25';
   };
 
   const getIconTone = (field) => {
@@ -411,10 +413,10 @@ export default function Register() {
             transform: 'translate3d(calc(var(--mx, 0) * -18px), calc(var(--my, 0) * -14px), 36px)'
           }}
         >
-          <div className="px-3.5 py-2 rounded-xl bg-[#0B1325]/95 border border-white/15 shadow-[0_14px_34px_rgba(0,0,0,0.68),inset_0_1px_0_rgba(255,255,255,0.1)] flex items-center gap-2 text-xs font-semibold text-slate-200">
-            <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-            <Radio size={14} className="text-orange-400" />
-            <span className={isUrdu ? 'font-urdu text-xs text-slate-100' : 'font-mono text-[11px] text-slate-100'}>
+          <div className="px-3.5 py-2 rounded-xl bg-white/95 dark:bg-[#0B1325]/95 border border-slate-200 dark:border-white/15 shadow-[0_14px_34px_rgba(0,0,0,0.12)] dark:shadow-[0_14px_34px_rgba(0,0,0,0.68),inset_0_1px_0_rgba(255,255,255,0.1)] flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-200">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 dark:bg-emerald-400"></span>
+            <Radio size={14} className="text-orange-500 dark:text-orange-400" />
+            <span className={isUrdu ? 'font-urdu text-xs text-slate-800 dark:text-slate-100' : 'font-mono text-[11px] text-slate-800 dark:text-slate-100'}>
               {isUrdu ? 'فوری تصدیقی نیٹ ورک' : 'Verified Fleet Registry'}
             </span>
           </div>
@@ -426,9 +428,9 @@ export default function Register() {
             transform: 'translate3d(calc(var(--mx, 0) * 18px), calc(var(--my, 0) * 14px), 44px)'
           }}
         >
-          <div className="px-3.5 py-2 rounded-xl bg-[#0B1325]/95 border border-white/15 shadow-[0_14px_34px_rgba(0,0,0,0.68),inset_0_1px_0_rgba(255,255,255,0.1)] flex items-center gap-2 text-xs font-semibold text-slate-200">
-            <ShieldCheck size={16} className="text-cyan-400" />
-            <span className={isUrdu ? 'font-urdu text-xs text-slate-100' : 'font-mono text-[11px] text-slate-100'}>
+          <div className="px-3.5 py-2 rounded-xl bg-white/95 dark:bg-[#0B1325]/95 border border-slate-200 dark:border-white/15 shadow-[0_14px_34px_rgba(0,0,0,0.12)] dark:shadow-[0_14px_34px_rgba(0,0,0,0.68),inset_0_1px_0_rgba(255,255,255,0.1)] flex items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-200">
+            <ShieldCheck size={16} className="text-cyan-600 dark:text-cyan-400" />
+            <span className={isUrdu ? 'font-urdu text-xs text-slate-800 dark:text-slate-100' : 'font-mono text-[11px] text-slate-800 dark:text-slate-100'}>
               {isUrdu ? 'محفوظ ڈیجیٹل ای-بلٹی' : 'Digital e-Bilty Ready'}
             </span>
           </div>
@@ -449,9 +451,9 @@ export default function Register() {
             {/* Clipped Surface Backdrop & Top 3D Gradient Accent (kept separate from preserve-3d content) */}
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute inset-0 rounded-2xl sm:rounded-3xl overflow-hidden border border-white/15 shadow-[0_28px_72px_-15px_rgba(0,0,0,0.9),inset_0_1px_0_rgba(255,255,255,0.08)] ring-1 ring-white/5 bg-[#0B1325]/96"
+              className="pointer-events-none absolute inset-0 rounded-2xl sm:rounded-3xl overflow-hidden border border-slate-200 dark:border-white/15 shadow-[0_20px_50px_rgba(0,0,0,0.12)] dark:shadow-[0_28px_72px_-15px_rgba(0,0,0,0.9),inset_0_1px_0_rgba(255,255,255,0.08)] ring-1 ring-slate-900/5 dark:ring-white/5 bg-white/95 dark:bg-[#0B1325]/96 backdrop-blur-md"
             >
-              <div className="h-1.5 w-full bg-gradient-to-r from-[#EA580C] via-[#F89020] to-cyan-400" />
+              <div className="h-1.5 w-full bg-[#EA580C]" />
             </div>
 
             <div className="p-4 sm:p-7 pt-5 sm:pt-8 relative z-10 preserve-3d">
@@ -463,17 +465,12 @@ export default function Register() {
                   </div>
                 </div>
 
-                <h1 className={`text-xl sm:text-2xl font-black text-white mb-1 tracking-tight depth-z-sm ${isUrdu ? 'font-urdu text-2xl' : ''}`}>
+                <h1 className={`text-xl sm:text-2xl font-black text-slate-900 dark:text-white mb-1.5 tracking-tight depth-z-sm ${isUrdu ? 'font-urdu text-2xl' : ''}`}>
                   {t('regTitle')}
                 </h1>
-                <p className={`text-xs sm:text-[13px] text-slate-300 font-normal mb-2.5 ${isUrdu ? 'font-urdu text-sm' : ''}`}>
+                <p className={`text-xs sm:text-[13px] text-slate-600 dark:text-slate-300 font-normal mb-6 sm:mb-7 ${isUrdu ? 'font-urdu text-sm' : ''}`}>
                   {t('regSub')}
                 </p>
-
-                <div className="flex items-center justify-center gap-2 flex-wrap depth-z-sm">
-                  <UrduMotto />
-                  <NazarBattuBadge />
-                </div>
               </div>
 
               {error && (
@@ -496,10 +493,10 @@ export default function Register() {
                 {/* Section 1: Role Selection (2x2 Tactile 3D Cards) */}
                 <div>
                   <div className="flex items-baseline justify-between gap-2 mb-2">
-                    <label className={`block text-[11px] font-bold text-slate-200 uppercase tracking-wider ${isUrdu ? 'font-urdu text-xs' : ''}`}>
+                    <label className={`block text-[11px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider ${isUrdu ? 'font-urdu text-xs' : ''}`}>
                       {t('roleSelectLabel')} *
                     </label>
-                    <span className={`text-[11px] text-slate-400 ${isUrdu ? 'font-urdu text-xs' : ''}`}>
+                    <span className={`text-[11px] text-slate-500 dark:text-slate-400 ${isUrdu ? 'font-urdu text-xs' : ''}`}>
                       {isUrdu ? 'اپنا پورٹل منتخب کریں' : 'Choose your portal'}
                     </span>
                   </div>
@@ -516,29 +513,29 @@ export default function Register() {
                             isUrdu ? 'text-right' : 'text-left'
                           } ${
                             selected
-                              ? 'bg-gradient-to-br from-orange-500/24 to-orange-600/12 border-orange-400/85 text-white shadow-[0_10px_24px_-8px_rgba(249,115,22,0.58),inset_0_1px_0_rgba(255,255,255,0.2)]'
-                              : 'bg-white/[0.04] hover:bg-white/[0.08] border-white/12 text-slate-300 hover:border-white/25 hover:text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]'
+                              ? 'bg-gradient-to-br from-orange-500/20 to-orange-600/10 dark:from-orange-500/24 dark:to-orange-600/12 border-orange-500 dark:border-orange-400/85 text-slate-900 dark:text-white shadow-md shadow-orange-500/15'
+                              : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700 hover:text-slate-900 hover:border-slate-300 dark:bg-white/[0.04] dark:hover:bg-white/[0.08] dark:border-white/12 dark:text-slate-300 dark:hover:border-white/25 dark:hover:text-white shadow-xs dark:shadow-none'
                           }`}
                         >
                           <span
                             className={`w-9 h-9 rounded-lg border flex items-center justify-center shrink-0 transition-colors ${
                               selected
-                                ? 'bg-orange-500/25 border-orange-400/55 text-orange-300'
-                                : 'bg-white/[0.05] border-white/10 text-slate-400'
+                                ? 'bg-orange-500/20 dark:bg-orange-500/25 border-orange-500/50 text-orange-600 dark:text-orange-300'
+                                : 'bg-slate-100 dark:bg-white/[0.05] border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400'
                             }`}
                           >
                             <Icon size={17} />
                           </span>
                           <span className="min-w-0 flex-1">
-                            <span className={`block text-xs sm:text-[13px] font-bold leading-snug ${isUrdu ? 'font-urdu text-sm leading-normal' : ''}`}>
+                            <span className={`block text-xs sm:text-[13px] font-bold leading-snug text-slate-900 dark:text-white ${isUrdu ? 'font-urdu text-sm leading-normal' : ''}`}>
                               {label}
                             </span>
-                            <span className={`block text-[11px] text-slate-400 leading-snug mt-0.5 ${isUrdu ? 'font-urdu text-xs leading-normal' : ''}`}>
+                            <span className={`block text-[11px] text-slate-500 dark:text-slate-400 leading-snug mt-0.5 ${isUrdu ? 'font-urdu text-xs leading-normal' : ''}`}>
                               {hint}
                             </span>
                           </span>
                           {selected && (
-                            <CheckCircle2 size={16} className="text-orange-400 shrink-0" />
+                            <CheckCircle2 size={16} className="text-orange-500 dark:text-orange-400 shrink-0" />
                           )}
                         </button>
                       );
@@ -547,14 +544,14 @@ export default function Register() {
                 </div>
 
                 {/* Section 2: Personal & Contact Details */}
-                <div className="pt-3.5 border-t border-white/10 space-y-3.5">
+                <div className="pt-3.5 border-t border-slate-200 dark:border-white/10 space-y-3.5">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 items-start">
                     {/* Full Name */}
                     <div className="group">
                       <label
                         htmlFor="reg-name"
                         className={`block text-[11px] font-bold uppercase tracking-wider mb-1 ${
-                          errors.name && touched.name ? 'text-rose-400' : 'text-slate-200 group-focus-within:text-orange-400'
+                          errors.name && touched.name ? 'text-rose-600 dark:text-rose-400' : 'text-slate-700 dark:text-slate-200 group-focus-within:text-orange-500'
                         } ${isUrdu ? 'font-urdu text-xs' : ''}`}
                       >
                         {t('nameLabel')} *
@@ -568,18 +565,18 @@ export default function Register() {
                           ref={registerFieldRef('name')}
                           type="text"
                           autoComplete="name"
-                          className={`block w-full rounded-xl ${isUrdu ? 'pr-9 pl-8 text-right' : 'pl-9 pr-8 text-left'} py-2.5 bg-transparent border-0 focus:outline-none text-white placeholder-slate-400 text-[15px] sm:text-sm font-medium`}
+                          className={`block w-full rounded-xl ${isUrdu ? 'pr-9 pl-8 text-right' : 'pl-9 pr-8 text-left'} py-2.5 bg-transparent border-0 focus:outline-none text-slate-900 dark:text-white placeholder-slate-400 text-[15px] sm:text-sm font-medium`}
                           placeholder={t('namePlaceholder')}
                           value={name}
                           onChange={(e) => handleFieldChange('name', e.target.value)}
                           onBlur={() => handleBlur('name')}
                         />
                         {isFieldValid('name') && (
-                          <Check size={14} className={`absolute top-1/2 -translate-y-1/2 ${isUrdu ? 'left-3' : 'right-3'} text-emerald-400 pointer-events-none`} />
+                          <Check size={14} className={`absolute top-1/2 -translate-y-1/2 ${isUrdu ? 'left-3' : 'right-3'} text-emerald-500 dark:text-emerald-400 pointer-events-none`} />
                         )}
                       </div>
                       {errors.name && touched.name && (
-                        <p className={`flex items-center gap-1 text-rose-400 text-[11px] font-semibold mt-1 ${isUrdu ? 'font-urdu text-xs' : ''}`}>
+                        <p className={`flex items-center gap-1 text-rose-600 dark:text-rose-400 text-[11px] font-semibold mt-1 ${isUrdu ? 'font-urdu text-xs' : ''}`}>
                           <AlertCircle size={12} className="shrink-0" />
                           <span>{errors.name}</span>
                         </p>
@@ -591,7 +588,7 @@ export default function Register() {
                       <label
                         htmlFor="reg-email"
                         className={`block text-[11px] font-bold uppercase tracking-wider mb-1 ${
-                          errors.email && touched.email ? 'text-rose-400' : 'text-slate-200 group-focus-within:text-orange-400'
+                          errors.email && touched.email ? 'text-rose-600 dark:text-rose-400' : 'text-slate-700 dark:text-slate-200 group-focus-within:text-orange-500'
                         } ${isUrdu ? 'font-urdu text-xs' : ''}`}
                       >
                         {t('emailLabel')} *
@@ -607,18 +604,18 @@ export default function Register() {
                           autoComplete="email"
                           inputMode="email"
                           dir="ltr"
-                          className={`block w-full rounded-xl ${isUrdu ? 'pr-9 pl-8 text-right' : 'pl-9 pr-8 text-left'} py-2.5 bg-transparent border-0 focus:outline-none text-white placeholder-slate-400 text-[15px] sm:text-sm font-medium`}
+                          className={`block w-full rounded-xl ${isUrdu ? 'pr-9 pl-8 text-right' : 'pl-9 pr-8 text-left'} py-2.5 bg-transparent border-0 focus:outline-none text-slate-900 dark:text-white placeholder-slate-400 text-[15px] sm:text-sm font-medium`}
                           placeholder={t('emailPlaceholder')}
                           value={email}
                           onChange={(e) => handleFieldChange('email', e.target.value)}
                           onBlur={() => handleBlur('email')}
                         />
                         {isFieldValid('email') && (
-                          <Check size={14} className={`absolute top-1/2 -translate-y-1/2 ${isUrdu ? 'left-3' : 'right-3'} text-emerald-400 pointer-events-none`} />
+                          <Check size={14} className={`absolute top-1/2 -translate-y-1/2 ${isUrdu ? 'left-3' : 'right-3'} text-emerald-500 dark:text-emerald-400 pointer-events-none`} />
                         )}
                       </div>
                       {errors.email && touched.email && (
-                        <p className={`flex items-center gap-1 text-rose-400 text-[11px] font-semibold mt-1 ${isUrdu ? 'font-urdu text-xs' : ''}`}>
+                        <p className={`flex items-center gap-1 text-rose-600 dark:text-rose-400 text-[11px] font-semibold mt-1 ${isUrdu ? 'font-urdu text-xs' : ''}`}>
                           <AlertCircle size={12} className="shrink-0" />
                           <span>{errors.email}</span>
                         </p>
@@ -634,12 +631,12 @@ export default function Register() {
                         <label
                           htmlFor="reg-cnic"
                           className={`block text-[11px] font-bold uppercase tracking-wider ${
-                            errors.cnic && touched.cnic ? 'text-rose-400' : 'text-slate-200 group-focus-within:text-orange-400'
+                            errors.cnic && touched.cnic ? 'text-rose-600 dark:text-rose-400' : 'text-slate-700 dark:text-slate-200 group-focus-within:text-orange-500'
                           } ${isUrdu ? 'font-urdu text-xs' : ''}`}
                         >
                           {t('cnicLabel')} *
                         </label>
-                        <span className={`text-[10px] text-slate-400 shrink-0 ${isUrdu ? 'font-urdu text-xs' : 'font-mono'}`}>
+                        <span className={`text-[10px] text-slate-500 dark:text-slate-400 shrink-0 ${isUrdu ? 'font-urdu text-xs' : 'font-mono'}`}>
                           {isUrdu ? '13 ہندسے' : '13 digits'}
                         </span>
                       </div>
@@ -654,23 +651,23 @@ export default function Register() {
                           inputMode="numeric"
                           dir="ltr"
                           maxLength={22}
-                          className={`block w-full rounded-xl ${isUrdu ? 'pr-9 pl-8 text-right' : 'pl-9 pr-8 text-left'} py-2.5 bg-transparent border-0 focus:outline-none text-white placeholder-slate-400 text-[15px] sm:text-sm font-mono`}
+                          className={`block w-full rounded-xl ${isUrdu ? 'pr-9 pl-8 text-right' : 'pl-9 pr-8 text-left'} py-2.5 bg-transparent border-0 focus:outline-none text-slate-900 dark:text-white placeholder-slate-400 text-[15px] sm:text-sm font-mono`}
                           placeholder="35202-1234567-1"
                           value={cnic}
                           onChange={(e) => handleFieldChange('cnic', e.target.value)}
                           onBlur={() => handleBlur('cnic')}
                         />
                         {isFieldValid('cnic') && (
-                          <Check size={14} className={`absolute top-1/2 -translate-y-1/2 ${isUrdu ? 'left-3' : 'right-3'} text-emerald-400 pointer-events-none`} />
+                          <Check size={14} className={`absolute top-1/2 -translate-y-1/2 ${isUrdu ? 'left-3' : 'right-3'} text-emerald-500 dark:text-emerald-400 pointer-events-none`} />
                         )}
                       </div>
                       {errors.cnic && touched.cnic ? (
-                        <p className={`flex items-center gap-1 text-rose-400 text-[11px] font-semibold mt-1 ${isUrdu ? 'font-urdu text-xs' : ''}`}>
+                        <p className={`flex items-center gap-1 text-rose-600 dark:text-rose-400 text-[11px] font-semibold mt-1 ${isUrdu ? 'font-urdu text-xs' : ''}`}>
                           <AlertCircle size={12} className="shrink-0" />
                           <span>{errors.cnic}</span>
                         </p>
                       ) : (
-                        <p className={`text-[10px] text-slate-400 mt-1 ${isUrdu ? 'font-urdu text-xs' : ''}`}>
+                        <p className={`text-[10px] text-slate-500 dark:text-slate-400 mt-1 ${isUrdu ? 'font-urdu text-xs' : ''}`}>
                           {isUrdu ? 'صرف ہندسے لکھیں، ڈیش خودکار لگیں گے' : 'Dashes format automatically'}
                         </p>
                       )}
@@ -682,12 +679,12 @@ export default function Register() {
                         <label
                           htmlFor="reg-phone"
                           className={`block text-[11px] font-bold uppercase tracking-wider ${
-                            errors.phone && touched.phone ? 'text-rose-400' : 'text-slate-200 group-focus-within:text-orange-400'
+                            errors.phone && touched.phone ? 'text-rose-600 dark:text-rose-400' : 'text-slate-700 dark:text-slate-200 group-focus-within:text-orange-500'
                           } ${isUrdu ? 'font-urdu text-xs' : ''}`}
                         >
                           {t('phoneLabel')} *
                         </label>
-                        <span className={`text-[10px] text-slate-400 shrink-0 ${isUrdu ? 'font-urdu text-xs' : 'font-mono'}`}>
+                        <span className={`text-[10px] text-slate-500 dark:text-slate-400 shrink-0 ${isUrdu ? 'font-urdu text-xs' : 'font-mono'}`}>
                           {isUrdu ? 'موبائل / واٹس ایپ' : '03XX Mobile'}
                         </span>
                       </div>
@@ -703,38 +700,70 @@ export default function Register() {
                           inputMode="tel"
                           dir="ltr"
                           maxLength={22}
-                          className={`block w-full rounded-xl ${isUrdu ? 'pr-9 pl-8 text-right' : 'pl-9 pr-8 text-left'} py-2.5 bg-transparent border-0 focus:outline-none text-white placeholder-slate-400 text-[15px] sm:text-sm font-mono`}
+                          className={`block w-full rounded-xl ${isUrdu ? 'pr-9 pl-8 text-right' : 'pl-9 pr-8 text-left'} py-2.5 bg-transparent border-0 focus:outline-none text-slate-900 dark:text-white placeholder-slate-400 text-[15px] sm:text-sm font-mono`}
                           placeholder="0300-1234567"
                           value={phone}
                           onChange={(e) => handleFieldChange('phone', e.target.value)}
                           onBlur={() => handleBlur('phone')}
                         />
                         {isFieldValid('phone') && (
-                          <Check size={14} className={`absolute top-1/2 -translate-y-1/2 ${isUrdu ? 'left-3' : 'right-3'} text-emerald-400 pointer-events-none`} />
+                          <Check size={14} className={`absolute top-1/2 -translate-y-1/2 ${isUrdu ? 'left-3' : 'right-3'} text-emerald-500 dark:text-emerald-400 pointer-events-none`} />
                         )}
                       </div>
                       {errors.phone && touched.phone ? (
-                        <p className={`flex items-center gap-1 text-rose-400 text-[11px] font-semibold mt-1 ${isUrdu ? 'font-urdu text-xs' : ''}`}>
+                        <p className={`flex items-center gap-1 text-rose-600 dark:text-rose-400 text-[11px] font-semibold mt-1 ${isUrdu ? 'font-urdu text-xs' : ''}`}>
                           <AlertCircle size={12} className="shrink-0" />
                           <span>{errors.phone}</span>
                         </p>
                       ) : (
-                        <p className={`text-[10px] text-slate-400 mt-1 ${isUrdu ? 'font-urdu text-xs' : ''}`}>
+                        <p className={`text-[10px] text-slate-500 dark:text-slate-400 mt-1 ${isUrdu ? 'font-urdu text-xs' : ''}`}>
                           {isUrdu ? '03XX یا +92 نمبر درج کریں' : 'Accepts 03XX or +923XX format'}
                         </p>
                       )}
+                    </div>
+
+                    {/* Operational Base City */}
+                    <div className="group sm:col-span-2">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <label
+                          htmlFor="reg-city"
+                          className={`block text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 group-focus-within:text-orange-500 ${isUrdu ? 'font-urdu text-xs' : ''}`}
+                        >
+                          {isUrdu ? 'بنیادی شہر / لاجسٹکس ہب *' : 'Base Operational City / Logistics Hub *'}
+                        </label>
+                        <span className={`text-[10px] text-orange-600 dark:text-orange-400 font-bold ${isUrdu ? 'font-urdu text-xs' : 'font-mono'}`}>
+                          {isUrdu ? 'قریبی پارٹنرز تلاش کرنے کے لیے' : 'Used for proximity matching'}
+                        </span>
+                      </div>
+                      <div className="relative rounded-xl border border-slate-300 dark:border-white/15 bg-white dark:bg-white/[0.05] transition-colors focus-within:border-orange-500">
+                        <div className={`absolute inset-y-0 ${isUrdu ? 'right-0 pr-3' : 'left-0 pl-3'} flex items-center pointer-events-none text-orange-500`}>
+                          <GpsMapPin size={15} />
+                        </div>
+                        <select
+                          id="reg-city"
+                          value={city}
+                          onChange={(e) => setCity(e.target.value)}
+                          className={`block w-full rounded-xl ${isUrdu ? 'pr-9 pl-3 text-right' : 'pl-9 pr-3 text-left'} py-2.5 bg-transparent border-0 focus:outline-none text-slate-900 dark:text-white text-[15px] sm:text-sm font-semibold cursor-pointer`}
+                        >
+                          {PAKISTAN_CITIES.map((c) => (
+                            <option key={c.id || c.name} value={c.name} className="bg-white dark:bg-[#0B1325] text-slate-900 dark:text-white">
+                              {c.label || c.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Section 3: Organization Verification (Business & Transporter) */}
                 {requiresBusinessInfo && (
-                  <div className="pt-3.5 border-t border-white/10">
+                  <div className="pt-3.5 border-t border-slate-200 dark:border-white/10">
                     <div className="flex items-center justify-between gap-2 mb-2.5">
-                      <span className={`text-[11px] font-bold uppercase tracking-wider text-orange-300 ${isUrdu ? 'font-urdu text-xs' : ''}`}>
+                      <span className={`text-[11px] font-bold uppercase tracking-wider text-orange-600 dark:text-orange-300 ${isUrdu ? 'font-urdu text-xs' : ''}`}>
                         {isUrdu ? 'کاروبار اور رجسٹریشن کی تفصیلات' : 'Organization Details'}
                       </span>
-                      <span className={`text-[10px] text-slate-400 ${isUrdu ? 'font-urdu text-xs' : 'font-mono'}`}>
+                      <span className={`text-[10px] text-slate-500 dark:text-slate-400 ${isUrdu ? 'font-urdu text-xs' : 'font-mono'}`}>
                         {isUrdu ? 'لازمی تصدیق' : 'KYB Verification'}
                       </span>
                     </div>
@@ -746,8 +775,8 @@ export default function Register() {
                           htmlFor="reg-biz-name"
                           className={`block text-[11px] font-bold uppercase tracking-wider mb-1 ${
                             errors.businessName && touched.businessName
-                              ? 'text-rose-400'
-                              : 'text-slate-200 group-focus-within:text-orange-400'
+                              ? 'text-rose-600 dark:text-rose-400'
+                              : 'text-slate-700 dark:text-slate-200 group-focus-within:text-orange-500'
                           } ${isUrdu ? 'font-urdu text-xs' : ''}`}
                         >
                           {t('businessNameLabel')} *
@@ -761,23 +790,23 @@ export default function Register() {
                             ref={registerFieldRef('businessName')}
                             type="text"
                             autoComplete="organization"
-                            className={`block w-full rounded-xl ${isUrdu ? 'pr-9 pl-8 text-right' : 'pl-9 pr-8 text-left'} py-2.5 bg-transparent border-0 focus:outline-none text-white placeholder-slate-400 text-[15px] sm:text-sm font-medium`}
+                            className={`block w-full rounded-xl ${isUrdu ? 'pr-9 pl-8 text-right' : 'pl-9 pr-8 text-left'} py-2.5 bg-transparent border-0 focus:outline-none text-slate-900 dark:text-white placeholder-slate-400 text-[15px] sm:text-sm font-medium`}
                             placeholder={t('businessNamePlaceholder')}
                             value={businessName}
                             onChange={(e) => handleFieldChange('businessName', e.target.value)}
                             onBlur={() => handleBlur('businessName')}
                           />
                           {isFieldValid('businessName') && (
-                            <Check size={14} className={`absolute top-1/2 -translate-y-1/2 ${isUrdu ? 'left-3' : 'right-3'} text-emerald-400 pointer-events-none`} />
+                            <Check size={14} className={`absolute top-1/2 -translate-y-1/2 ${isUrdu ? 'left-3' : 'right-3'} text-emerald-500 dark:text-emerald-400 pointer-events-none`} />
                           )}
                         </div>
                         {errors.businessName && touched.businessName ? (
-                          <p className={`flex items-center gap-1 text-rose-400 text-[11px] font-semibold mt-1 ${isUrdu ? 'font-urdu text-xs' : ''}`}>
+                          <p className={`flex items-center gap-1 text-rose-600 dark:text-rose-400 text-[11px] font-semibold mt-1 ${isUrdu ? 'font-urdu text-xs' : ''}`}>
                             <AlertCircle size={12} className="shrink-0" />
                             <span>{errors.businessName}</span>
                           </p>
                         ) : (
-                          <p className={`text-[10px] text-slate-400 mt-1 ${isUrdu ? 'font-urdu text-xs' : ''}`}>
+                          <p className={`text-[10px] text-slate-500 dark:text-slate-400 mt-1 ${isUrdu ? 'font-urdu text-xs' : ''}`}>
                             {isUrdu ? 'رجسٹرڈ کمپنی یا کاروبار کا نام' : 'Registered trade or firm name'}
                           </p>
                         )}
@@ -789,8 +818,8 @@ export default function Register() {
                           htmlFor="reg-biz-ntn"
                           className={`block text-[11px] font-bold uppercase tracking-wider mb-1 ${
                             errors.businessRegNumber && touched.businessRegNumber
-                              ? 'text-rose-400'
-                              : 'text-slate-200 group-focus-within:text-orange-400'
+                              ? 'text-rose-600 dark:text-rose-400'
+                              : 'text-slate-700 dark:text-slate-200 group-focus-within:text-orange-500'
                           } ${isUrdu ? 'font-urdu text-xs' : ''}`}
                         >
                           {t('businessRegLabel')} *
@@ -804,23 +833,23 @@ export default function Register() {
                             ref={registerFieldRef('businessRegNumber')}
                             type="text"
                             dir="ltr"
-                            className={`block w-full rounded-xl ${isUrdu ? 'pr-9 pl-8 text-right' : 'pl-9 pr-8 text-left'} py-2.5 bg-transparent border-0 focus:outline-none text-white placeholder-slate-400 text-[15px] sm:text-sm font-mono`}
+                            className={`block w-full rounded-xl ${isUrdu ? 'pr-9 pl-8 text-right' : 'pl-9 pr-8 text-left'} py-2.5 bg-transparent border-0 focus:outline-none text-slate-900 dark:text-white placeholder-slate-400 text-[15px] sm:text-sm font-mono`}
                             placeholder="1234567-8"
                             value={businessRegNumber}
                             onChange={(e) => handleFieldChange('businessRegNumber', e.target.value)}
                             onBlur={() => handleBlur('businessRegNumber')}
                           />
                           {isFieldValid('businessRegNumber') && (
-                            <Check size={14} className={`absolute top-1/2 -translate-y-1/2 ${isUrdu ? 'left-3' : 'right-3'} text-emerald-400 pointer-events-none`} />
+                            <Check size={14} className={`absolute top-1/2 -translate-y-1/2 ${isUrdu ? 'left-3' : 'right-3'} text-emerald-500 dark:text-emerald-400 pointer-events-none`} />
                           )}
                         </div>
                         {errors.businessRegNumber && touched.businessRegNumber ? (
-                          <p className={`flex items-center gap-1 text-rose-400 text-[11px] font-semibold mt-1 ${isUrdu ? 'font-urdu text-xs' : ''}`}>
+                          <p className={`flex items-center gap-1 text-rose-600 dark:text-rose-400 text-[11px] font-semibold mt-1 ${isUrdu ? 'font-urdu text-xs' : ''}`}>
                             <AlertCircle size={12} className="shrink-0" />
                             <span>{errors.businessRegNumber}</span>
                           </p>
                         ) : (
-                          <p className={`text-[10px] text-slate-400 mt-1 ${isUrdu ? 'font-urdu text-xs' : ''}`}>
+                          <p className={`text-[10px] text-slate-500 dark:text-slate-400 mt-1 ${isUrdu ? 'font-urdu text-xs' : ''}`}>
                             {isUrdu ? '8 ہندسوں کا این ٹی این یا رجسٹریشن کوڈ' : '8-digit NTN or 6–16 char reg ID'}
                           </p>
                         )}
@@ -830,7 +859,7 @@ export default function Register() {
                 )}
 
                 {/* Section 4: Account Security Passwords */}
-                <div className="pt-3.5 border-t border-white/10">
+                <div className="pt-3.5 border-t border-slate-200 dark:border-white/10">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 items-start">
                     {/* Password */}
                     <div className="group">
@@ -838,7 +867,7 @@ export default function Register() {
                         <label
                           htmlFor="reg-password"
                           className={`block text-[11px] font-bold uppercase tracking-wider ${
-                            errors.password && touched.password ? 'text-rose-400' : 'text-slate-200 group-focus-within:text-orange-400'
+                            errors.password && touched.password ? 'text-rose-600 dark:text-rose-400' : 'text-slate-700 dark:text-slate-200 group-focus-within:text-orange-500'
                           } ${isUrdu ? 'font-urdu text-xs' : ''}`}
                         >
                           {t('passwordLabel')} *
@@ -859,7 +888,7 @@ export default function Register() {
                           type={showPassword ? 'text' : 'password'}
                           autoComplete="new-password"
                           dir="ltr"
-                          className={`block w-full rounded-xl ${isUrdu ? 'pr-9 pl-10 text-right' : 'pl-9 pr-10 text-left'} py-2.5 bg-transparent border-0 focus:outline-none text-white placeholder-slate-400 text-[15px] sm:text-sm`}
+                          className={`block w-full rounded-xl ${isUrdu ? 'pr-9 pl-10 text-right' : 'pl-9 pr-10 text-left'} py-2.5 bg-transparent border-0 focus:outline-none text-slate-900 dark:text-white placeholder-slate-400 text-[15px] sm:text-sm`}
                           placeholder={t('passwordPlaceholder')}
                           value={password}
                           onChange={(e) => handleFieldChange('password', e.target.value)}
@@ -869,7 +898,7 @@ export default function Register() {
                           type="button"
                           aria-label={showPassword ? 'Hide password' : 'Show password'}
                           onClick={() => setShowPassword((prev) => !prev)}
-                          className={`absolute inset-y-0 ${isUrdu ? 'left-0 pl-3' : 'right-0 pr-3'} flex items-center text-slate-400 hover:text-white transition-colors cursor-pointer`}
+                          className={`absolute inset-y-0 ${isUrdu ? 'left-0 pl-3' : 'right-0 pr-3'} flex items-center text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors cursor-pointer`}
                         >
                           {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                         </button>
@@ -880,20 +909,20 @@ export default function Register() {
                             <div
                               key={step}
                               className={`h-1 flex-1 rounded-full transition-colors ${
-                                passwordStrength.score >= step ? passwordStrength.color : 'bg-white/10'
+                                passwordStrength.score >= step ? passwordStrength.color : 'bg-slate-200 dark:bg-white/10'
                               }`}
                             />
                           ))}
                         </div>
                       ) : (
                         !errors.password && (
-                          <p className={`text-[10px] text-slate-400 mt-1 ${isUrdu ? 'font-urdu text-xs' : ''}`}>
+                          <p className={`text-[10px] text-slate-500 dark:text-slate-400 mt-1 ${isUrdu ? 'font-urdu text-xs' : ''}`}>
                             {isUrdu ? 'کم از کم 6 حروف درکار ہیں' : 'Minimum 6 characters required'}
                           </p>
                         )
                       )}
                       {errors.password && touched.password && (
-                        <p className={`flex items-center gap-1 text-rose-400 text-[11px] font-semibold mt-1 ${isUrdu ? 'font-urdu text-xs' : ''}`}>
+                        <p className={`flex items-center gap-1 text-rose-600 dark:text-rose-400 text-[11px] font-semibold mt-1 ${isUrdu ? 'font-urdu text-xs' : ''}`}>
                           <AlertCircle size={12} className="shrink-0" />
                           <span>{errors.password}</span>
                         </p>
@@ -906,7 +935,7 @@ export default function Register() {
                         <label
                           htmlFor="reg-confirm-password"
                           className={`block text-[11px] font-bold uppercase tracking-wider ${
-                            errors.confirmPassword && touched.confirmPassword ? 'text-rose-400' : 'text-slate-200 group-focus-within:text-orange-400'
+                            errors.confirmPassword && touched.confirmPassword ? 'text-rose-600 dark:text-rose-400' : 'text-slate-700 dark:text-slate-200 group-focus-within:text-orange-500'
                           } ${isUrdu ? 'font-urdu text-xs' : ''}`}
                         >
                           {t('confirmPasswordLabel')} *
@@ -914,7 +943,7 @@ export default function Register() {
                         {confirmPassword && (
                           <span
                             className={`text-[10px] font-bold flex items-center gap-1 shrink-0 ${
-                              passwordsMatch ? 'text-emerald-300' : 'text-amber-300'
+                              passwordsMatch ? 'text-emerald-600 dark:text-emerald-300' : 'text-amber-600 dark:text-amber-300'
                             } ${isUrdu ? 'font-urdu' : ''}`}
                           >
                             {passwordsMatch ? (
@@ -938,7 +967,7 @@ export default function Register() {
                           type={showConfirmPassword ? 'text' : 'password'}
                           autoComplete="new-password"
                           dir="ltr"
-                          className={`block w-full rounded-xl ${isUrdu ? 'pr-9 pl-10 text-right' : 'pl-9 pr-10 text-left'} py-2.5 bg-transparent border-0 focus:outline-none text-white placeholder-slate-400 text-[15px] sm:text-sm`}
+                          className={`block w-full rounded-xl ${isUrdu ? 'pr-9 pl-10 text-right' : 'pl-9 pr-10 text-left'} py-2.5 bg-transparent border-0 focus:outline-none text-slate-900 dark:text-white placeholder-slate-400 text-[15px] sm:text-sm`}
                           placeholder={t('passwordPlaceholder')}
                           value={confirmPassword}
                           onChange={(e) => handleFieldChange('confirmPassword', e.target.value)}
@@ -948,18 +977,18 @@ export default function Register() {
                           type="button"
                           aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
                           onClick={() => setShowConfirmPassword((prev) => !prev)}
-                          className={`absolute inset-y-0 ${isUrdu ? 'left-0 pl-3' : 'right-0 pr-3'} flex items-center text-slate-400 hover:text-white transition-colors cursor-pointer`}
+                          className={`absolute inset-y-0 ${isUrdu ? 'left-0 pl-3' : 'right-0 pr-3'} flex items-center text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors cursor-pointer`}
                         >
                           {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                         </button>
                       </div>
                       {errors.confirmPassword && touched.confirmPassword ? (
-                        <p className={`flex items-center gap-1 text-rose-400 text-[11px] font-semibold mt-1 ${isUrdu ? 'font-urdu text-xs' : ''}`}>
+                        <p className={`flex items-center gap-1 text-rose-600 dark:text-rose-400 text-[11px] font-semibold mt-1 ${isUrdu ? 'font-urdu text-xs' : ''}`}>
                           <AlertCircle size={12} className="shrink-0" />
                           <span>{errors.confirmPassword}</span>
                         </p>
                       ) : (
-                        <p className={`text-[10px] text-slate-400 mt-1 ${isUrdu ? 'font-urdu text-xs' : ''}`}>
+                        <p className={`text-[10px] text-slate-500 dark:text-slate-400 mt-1 ${isUrdu ? 'font-urdu text-xs' : ''}`}>
                           {isUrdu ? 'تصدیق کے لیے وہی پاس ورڈ دوبارہ لکھیں' : 'Re-enter the same password'}
                         </p>
                       )}
@@ -999,28 +1028,28 @@ export default function Register() {
               </form>
 
               {/* Bottom Login Link */}
-              <div className={`mt-4 pt-3.5 border-t border-white/12 text-center text-xs text-slate-300 font-medium ${isUrdu ? 'font-urdu text-sm' : ''}`}>
+              <div className={`mt-4 pt-3.5 border-t border-slate-200 dark:border-white/12 text-center text-xs text-slate-600 dark:text-slate-300 font-medium ${isUrdu ? 'font-urdu text-sm' : ''}`}>
                 {t('alreadyHaveAccount')}{' '}
                 <Link
                   to="/login"
-                  className="text-orange-400 hover:text-orange-300 transition-colors font-bold underline underline-offset-4"
+                  className="text-orange-600 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300 transition-colors font-bold underline underline-offset-4"
                 >
                   {t('loginHere')}
                 </Link>
               </div>
 
               {/* Compact Server Connection Utility */}
-              <div className="mt-3 rounded-xl bg-white/[0.04] border border-white/10 px-3 py-2 text-center space-y-2">
-                <div className="flex items-center justify-center gap-1.5 text-[11px] font-mono text-slate-400 flex-wrap">
-                  <Globe size={12} className="text-orange-400 shrink-0" />
+              <div className="mt-3 rounded-xl bg-slate-100/80 dark:bg-white/[0.04] border border-slate-200 dark:border-white/10 px-3 py-2 text-center space-y-2">
+                <div className="flex items-center justify-center gap-1.5 text-[11px] font-mono text-slate-500 dark:text-slate-400 flex-wrap">
+                  <Globe size={12} className="text-orange-500 dark:text-orange-400 shrink-0" />
                   <span dir="ltr" className="inline-flex items-center gap-1">
                     <span>Server:</span>
-                    <span className="text-slate-100 font-semibold">{currentServerUrl}</span>
+                    <span className="text-slate-800 dark:text-slate-100 font-semibold">{currentServerUrl}</span>
                   </span>
                   <button
                     type="button"
                     onClick={() => setShowIpEditor(!showIpEditor)}
-                    className={`text-orange-400 hover:text-orange-300 font-bold hover:underline cursor-pointer ms-1 ${isUrdu ? 'font-urdu text-xs' : 'font-sans'}`}
+                    className={`text-orange-600 hover:text-orange-700 dark:text-orange-400 dark:hover:text-orange-300 font-bold hover:underline cursor-pointer ms-1 ${isUrdu ? 'font-urdu text-xs' : 'font-sans'}`}
                   >
                     ({showIpEditor ? (isUrdu ? 'چھپائیں' : 'Hide') : (isUrdu ? 'آئی پی تبدیل کریں' : 'Change IP')})
                   </button>
@@ -1041,7 +1070,7 @@ export default function Register() {
                       }}
                       placeholder="192.168.18.93"
                       aria-label="Server IP Address"
-                      className="flex-1 min-w-0 bg-[#0F1930]/90 border border-white/15 rounded-lg px-2.5 py-1.5 text-xs font-mono text-white outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition-all"
+                      className="flex-1 min-w-0 bg-white dark:bg-[#0F1930]/90 border border-slate-300 dark:border-white/15 rounded-lg px-2.5 py-1.5 text-xs font-mono text-slate-900 dark:text-white outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 transition-all"
                     />
                     <button
                       type="button"
@@ -1055,7 +1084,7 @@ export default function Register() {
                       <button
                         type="button"
                         onClick={handleResetIp}
-                        className="text-slate-400 hover:text-white text-xs px-1.5 py-1 rounded hover:bg-white/10 font-medium cursor-pointer"
+                        className="text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white text-xs px-1.5 py-1 rounded hover:bg-slate-200/50 dark:hover:bg-white/10 font-medium cursor-pointer"
                       >
                         Reset
                       </button>
@@ -1066,7 +1095,7 @@ export default function Register() {
                 {ipStatus.message && (
                   <p
                     className={`text-[11px] font-medium flex items-center justify-center gap-1 ${
-                      ipStatus.ok ? 'text-emerald-300' : 'text-amber-300'
+                      ipStatus.ok ? 'text-emerald-700 dark:text-emerald-300' : 'text-amber-700 dark:text-amber-300'
                     } ${isUrdu ? 'font-urdu text-xs' : ''}`}
                   >
                     {ipStatus.ok && <Check size={12} className="shrink-0" />}

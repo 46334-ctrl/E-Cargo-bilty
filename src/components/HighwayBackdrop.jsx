@@ -1,5 +1,8 @@
+import React from 'react';
+import { useTheme } from '../contexts/ThemeContext';
+
 /**
- * Compositor-only GPU dark highway backdrop:
+ * Compositor-only GPU dark/light highway backdrop:
  * - Zero SVG stroke-dashoffset CPU repaints
  * - Pure translate3d + opacity GPU layer animations locked to native display FPS (60/120Hz)
  * - Bounded 3D perspective highway grid + converging static laser rails + gliding photon pulses
@@ -60,19 +63,24 @@ const BOKEH_ORBS = [
 export default function HighwayBackdrop({ variant = 'hero', fixed = false }) {
   const isHero = variant === 'hero';
   const positionClass = fixed ? 'fixed inset-0 z-0' : 'absolute inset-0';
+  const { isDark } = useTheme();
 
   return (
     <div
       aria-hidden="true"
-      className={`pointer-events-none ${positionClass} overflow-hidden select-none bg-[#060B16] gpu-backdrop-layer`}
+      className={`pointer-events-none ${positionClass} overflow-hidden select-none bg-slate-50 dark:bg-[#060B16] transition-colors duration-200 gpu-backdrop-layer`}
     >
-      {/* Deep midnight atmospheric radial base (static GPU texture) */}
+      {/* Deep atmospheric radial base (static GPU texture) */}
       <div
-        className="absolute inset-0"
+        className="absolute inset-0 transition-opacity duration-300"
         style={{
-          background: isHero
-            ? 'radial-gradient(ellipse 95% 75% at 50% 42%, #111D35 0%, #091020 48%, #050912 100%)'
-            : 'radial-gradient(ellipse 90% 80% at 50% 50%, #101B33 0%, #070C18 55%, #04070E 100%)',
+          background: isDark
+            ? (isHero
+                ? 'radial-gradient(ellipse 95% 75% at 50% 42%, #111D35 0%, #091020 48%, #050912 100%)'
+                : 'radial-gradient(ellipse 90% 80% at 50% 50%, #101B33 0%, #070C18 55%, #04070E 100%)')
+            : (isHero
+                ? 'radial-gradient(ellipse 95% 75% at 50% 28%, #FFFFFF 0%, #F8FAFC 52%, #EEF2F6 100%)'
+                : 'radial-gradient(ellipse 90% 80% at 50% 50%, #FFFFFF 0%, #F1F5F9 60%, #E2E8F0 100%)'),
         }}
       />
 
@@ -86,15 +94,16 @@ export default function HighwayBackdrop({ variant = 'hero', fixed = false }) {
               'translate3d(calc(var(--px, 50vw) - 50%), calc(var(--py, 34vh) - 50%), 0)',
             transition:
               'transform 140ms cubic-bezier(0.22, 1, 0.36, 1), opacity 260ms ease-out',
-            background:
-              'radial-gradient(circle, rgba(249, 115, 22, 0.12) 0%, rgba(6, 182, 212, 0.045) 45%, transparent 72%)',
+            background: isDark
+              ? 'radial-gradient(circle, rgba(249, 115, 22, 0.12) 0%, rgba(6, 182, 212, 0.045) 45%, transparent 72%)'
+              : 'radial-gradient(circle, rgba(249, 115, 22, 0.08) 0%, rgba(6, 182, 212, 0.03) 45%, transparent 72%)',
           }}
         />
       )}
 
       {/* Bounded lower-half 3D perspective road grid (100% GPU translate3d) */}
       <div
-        className="hidden sm:block absolute inset-x-0 top-[42%] bottom-0 opacity-35 overflow-hidden"
+        className="hidden sm:block absolute inset-x-0 top-[42%] bottom-0 opacity-20 dark:opacity-35 overflow-hidden"
         style={{
           transform: 'perspective(520px) rotateX(52deg) scale(1.35)',
           transformOrigin: 'center top',
@@ -107,8 +116,9 @@ export default function HighwayBackdrop({ variant = 'hero', fixed = false }) {
         <div
           className="absolute inset-x-0 -top-[56px] bottom-0 highway-grid-flow"
           style={{
-            backgroundImage:
-              'linear-gradient(to right, rgba(56, 189, 248, 0.16) 1px, transparent 1px), linear-gradient(to bottom, rgba(249, 115, 22, 0.13) 1px, transparent 1px)',
+            backgroundImage: isDark
+              ? 'linear-gradient(to right, rgba(56, 189, 248, 0.16) 1px, transparent 1px), linear-gradient(to bottom, rgba(249, 115, 22, 0.13) 1px, transparent 1px)'
+              : 'linear-gradient(to right, rgba(14, 165, 233, 0.12) 1px, transparent 1px), linear-gradient(to bottom, rgba(249, 115, 22, 0.10) 1px, transparent 1px)',
             backgroundSize: '56px 56px',
           }}
         />
@@ -116,7 +126,7 @@ export default function HighwayBackdrop({ variant = 'hero', fixed = false }) {
 
       {/* Static converging base rails (rasterized ONCE, zero per-frame SVG repaint) */}
       <svg
-        className="absolute inset-0 w-full h-full opacity-85"
+        className="absolute inset-0 w-full h-full opacity-60 dark:opacity-85"
         viewBox="0 0 1440 760"
         preserveAspectRatio="xMidYMid slice"
         fill="none"
@@ -231,16 +241,18 @@ export default function HighwayBackdrop({ variant = 'hero', fixed = false }) {
       <div
         className="absolute -left-24 top-[14%] w-[420px] h-[420px] rounded-full hero-glow-drift"
         style={{
-          background:
-            'radial-gradient(circle, rgba(249, 115, 22, 0.25) 0%, rgba(249, 115, 22, 0.1) 36%, transparent 72%)',
+          background: isDark
+            ? 'radial-gradient(circle, rgba(249, 115, 22, 0.25) 0%, rgba(249, 115, 22, 0.1) 36%, transparent 72%)'
+            : 'radial-gradient(circle, rgba(249, 115, 22, 0.12) 0%, rgba(249, 115, 22, 0.04) 36%, transparent 72%)',
         }}
       />
       <div
         className="absolute -right-24 bottom-[12%] w-[420px] h-[420px] rounded-full hero-glow-drift"
         style={{
           animationDelay: '2.5s',
-          background:
-            'radial-gradient(circle, rgba(6, 182, 212, 0.24) 0%, rgba(56, 189, 248, 0.09) 36%, transparent 72%)',
+          background: isDark
+            ? 'radial-gradient(circle, rgba(6, 182, 212, 0.24) 0%, rgba(56, 189, 248, 0.09) 36%, transparent 72%)'
+            : 'radial-gradient(circle, rgba(6, 182, 212, 0.10) 0%, rgba(56, 189, 248, 0.03) 36%, transparent 72%)',
         }}
       />
     </div>

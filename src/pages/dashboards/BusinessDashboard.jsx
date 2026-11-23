@@ -5,13 +5,18 @@ import {
   Users, FileText, Activity, AlertTriangle, Check, X, Shield,
   Package, Trash2, CheckCircle, Loader2, ArrowRight, Truck,
   Mail, Phone, Clock, Eye, AlertCircle, FileCheck, Send, MessageSquare,
-  MapPin, Calendar, Plus, Map, Info, Snowflake, Flame, ArrowUp, DollarSign, Calculator, Layers
+  Calendar, Plus, Info, Snowflake, Flame, ArrowUp, DollarSign, Calculator, Layers,
+  Handshake, TrendingUp, Coins, Repeat
 } from 'lucide-react';
+import GpsMapPin from '../../components/GpsMapPin';
+import PostCargoIcon from '../../components/PostCargoIcon';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { logisticsAPI, authAPI, socket } from '../../api';
 import BiltyModal from '../../components/BiltyModal';
-import { ChamakRibbon, TruckTaj, UrduMotto, WorkshopBadge, TruckPoetryBanner, SindhiTruckTexture, TruckPatternBorder, TruckLotusArchBadge, TruckMorBadge, NazarBattuBadge } from '../../components/TruckArt';
+import { ChamakRibbon, WorkshopBadge, TruckPoetryBanner, SindhiTruckTexture, TruckPatternBorder, TruckLotusArchBadge, TruckMorBadge } from '../../components/TruckArt';
 import MapViewer, { getCoordinatesForLocation } from '../../components/MapViewer';
+import ReportMissingCargoModal from '../../components/lostCargo/ReportMissingCargoModal';
+import LostCargoPortal from '../../components/lostCargo/LostCargoPortal';
 import {
   calculateFreightTariff,
   calculateVolumetricWeight,
@@ -19,7 +24,11 @@ import {
   SPECIAL_HANDLING_FLAGS,
   PAYMENT_TERMS_OPTIONS,
   formatFreightPrice,
-  formatWeightTons
+  formatWeightTons,
+  getIntercityDistance,
+  getBargainingPresets,
+  getQuickIncrements,
+  BARGAIN_QUICK_INCREMENTS
 } from '../../utils/fareCalculator';
 import SearchSelect from '../../components/SearchSelect';
 import UnitInput from '../../components/UnitInput';
@@ -41,6 +50,7 @@ import {
   validatePositiveNumber,
   validateRequired
 } from '../../utils/validation';
+import { sortByProximity, getProximityBadge, getProximityDistance } from '../../utils/proximity';
 
 export default function BusinessDashboard() {
   const { userData, currentUser } = useAuth();
@@ -56,6 +66,7 @@ export default function BusinessDashboard() {
   const [cargoList, setCargoList] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [trucks, setTrucks] = useState([]);
+  const [reportingCargo, setReportingCargo] = useState(null);
 
   // New Request Form states
   const [selectedTransporter, setSelectedTransporter] = useState(null);
@@ -71,6 +82,11 @@ export default function BusinessDashboard() {
   const [paymentTerms, setPaymentTerms] = useState('Prepaid');
   const [vehicleTypeChoice, setVehicleTypeChoice] = useState('18-Wheeler Trailer');
   const [rateType, setRateType] = useState('ton-km');
+  const [customerOfferFare, setCustomerOfferFare] = useState('');
+  const [hasUserManuallyEditedOffer, setHasUserManuallyEditedOffer] = useState(false);
+  const [reOfferAmount, setReOfferAmount] = useState('');
+  const [showReOfferInput, setShowReOfferInput] = useState(false);
+  const [isBargainingAction, setIsBargainingAction] = useState(false);
   const [formErrors, setFormErrors] = useState({});
   const [formSubmitted, setFormSubmitted] = useState(false);
 
@@ -86,6 +102,18 @@ export default function BusinessDashboard() {
   const [recipients, setRecipients] = useState([
     { fullName: '', phone: '', city: '', province: '', streetAddress: '', deadline: '', assignedProducts: '' }
   ]);
+
+  // Proximity Prioritization for Business Shipper
+  const userCity = currentUser?.city || userData?.city || 'Lahore';
+  const step1ReferenceCity = pickupDetails?.city || userCity;
+
+  const sortedTransportersForStep1 = useMemo(() => {
+    return sortByProximity(transporters, step1ReferenceCity, t => t.city || 'Lahore', isUrdu);
+  }, [transporters, step1ReferenceCity, isUrdu]);
+
+  const sortedTransportersForDirectory = useMemo(() => {
+    return sortByProximity(transporters, userCity, t => t.city || 'Lahore', isUrdu);
+  }, [transporters, userCity, isUrdu]);
 
   // Track Shipments selection state
   const [selectedCargo, setSelectedCargo] = useState(null);
@@ -243,17 +271,49 @@ export default function BusinessDashboard() {
   const volumetricWeight = calculateTotalVolumetricWeight();
   const chargeableWeight = Math.max(grossWeight, volumetricWeight);
 
-  // Dynamic tariff estimation
-  const destinationCity = recipients[0]?.city || 'Karachi';
+  // Dynamic route distance & delivery-specific tariff estimation
+  const pickupCity = pickupDetails.city?.trim() || '';
+  const deliveryCity = recipients[0]?.city?.trim() || '';
+  const hasRouteSpecified = Boolean(pickupCity && deliveryCity);
+
+  const originCity = pickupCity || userCity || 'Lahore';
+  const destinationCity = deliveryCity || (originCity.toLowerCase() === 'karachi' ? 'Lahore' : 'Karachi');
+
+  const estDistance = useMemo(() => {
+    if (hasRouteSpecified) {
+      return getIntercityDistance(pickupCity, deliveryCity);
+    }
+    return getIntercityDistance(originCity, destinationCity);
+  }, [hasRouteSpecified, pickupCity, deliveryCity, originCity, destinationCity]);
+
   const tariffQuote = useMemo(() => {
     return calculateFreightTariff({
-      origin: pickupDetails.city || 'Lahore',
+      origin: originCity,
       destination: destinationCity,
       chargeableTons: Math.max(0.5, chargeableWeight),
       vehicleType: vehicleTypeChoice,
       handlingFlags: specialHandling
     });
-  }, [pickupDetails.city, destinationCity, chargeableWeight, vehicleTypeChoice, specialHandling]);
+  }, [originCity, destinationCity, chargeableWeight, vehicleTypeChoice, specialHandling]);
+
+  const recommendedFare = useMemo(() => {
+    return tariffQuote.totalFare || tariffQuote.totalFreight || 45000;
+  }, [tariffQuote]);
+
+  const bargainingPresets = useMemo(() => {
+    return getBargainingPresets(recommendedFare);
+  }, [recommendedFare]);
+
+  const quickIncrements = useMemo(() => {
+    return getQuickIncrements(recommendedFare);
+  }, [recommendedFare]);
+
+  // Dynamically sync offer to the delivery's recommended fare until user manually edits
+  useEffect(() => {
+    if (!hasUserManuallyEditedOffer && recommendedFare) {
+      setCustomerOfferFare(String(recommendedFare));
+    }
+  }, [recommendedFare, hasUserManuallyEditedOffer]);
 
   const toggleSpecialHandling = (flagId) => {
     if (specialHandling.includes(flagId)) {
@@ -319,8 +379,64 @@ export default function BusinessDashboard() {
       if (ntnErr) errors.senderNTN = ntnErr;
     }
 
+    // Validate customer proposed freight offer
+    if (!customerOfferFare || parseFloat(customerOfferFare) <= 0) {
+      errors.offer = isUrdu ? 'براہ کرم اپنی کرایہ کی پیشکش درج کریں' : 'Please specify your proposed fare offer';
+    }
+
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
+  };
+
+  const handleCustomerAcceptCounter = async (cargo) => {
+    if (isBargainingAction) return;
+    setIsBargainingAction(true);
+    try {
+      const agreedFare = cargo.counterFare;
+      await logisticsAPI.updateCargo(cargo._id || cargo.id, {
+        totalFare: agreedFare,
+        baseFare: agreedFare,
+        status: 'Accepted',
+        fareStatus: 'Agreed',
+        counterFare: null,
+        counterBy: null
+      });
+      toast.success(isUrdu ? `پیشکش قبول کرلی گئی! کرایہ Rs. ${Number(agreedFare).toLocaleString()} طے پا گیا۔` : `Counter-offer accepted! Fare locked at Rs. ${Number(agreedFare).toLocaleString()}`);
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to accept counter-offer');
+    } finally {
+      setIsBargainingAction(false);
+    }
+  };
+
+  const handleCustomerReOffer = async (cargo) => {
+    const newOffer = parseFloat(reOfferAmount);
+    if (!newOffer || newOffer <= 0 || isBargainingAction) {
+      toast.error(isUrdu ? 'برائے مہربانی درست پیشکش درج کریں' : 'Please enter a valid counter amount');
+      return;
+    }
+    setIsBargainingAction(true);
+    try {
+      await logisticsAPI.updateCargo(cargo._id || cargo.id, {
+        totalFare: newOffer,
+        baseFare: newOffer,
+        fareStatus: 'Counter-Offered',
+        counterFare: null,
+        counterBy: 'customer',
+        counterNote: 'Customer re-offered new price'
+      });
+      toast.success(isUrdu ? `نئی جوابی پیشکش بھیج دی گئی: Rs. ${newOffer.toLocaleString()}` : `Counter-offer sent: Rs. ${newOffer.toLocaleString()}`);
+      setShowReOfferInput(false);
+      setReOfferAmount('');
+      fetchData();
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to submit re-offer');
+    } finally {
+      setIsBargainingAction(false);
+    }
   };
 
   useEffect(() => {
@@ -357,10 +473,11 @@ export default function BusinessDashboard() {
       paymentTerms,
       vehicleTypeChoice,
       rateType,
-      baseFare: tariffQuote.baseFreight,
-      fuelSurcharge: tariffQuote.fuelSurcharge,
-      taxAmount: tariffQuote.salesTax,
-      totalFare: tariffQuote.totalFreight,
+      baseFare: parseFloat(customerOfferFare) || recommendedFare,
+      fuelSurcharge: 0,
+      taxAmount: 0,
+      totalFare: parseFloat(customerOfferFare) || recommendedFare,
+      fareStatus: 'Offered',
       origin: pickupDetails.city || 'Depot',
       destination: recipients.map(r => r.city).join(', ') || 'Receivers',
       transporterId: selectedTransporter._id,
@@ -524,12 +641,11 @@ export default function BusinessDashboard() {
 
       {/* Command Header Panel */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6 relative z-10 rounded-2xl sm:rounded-3xl bg-[#0B1325]/96 border border-white/15 p-4 sm:p-6 shadow-[0_18px_48px_-14px_rgba(0,0,0,0.75)] overflow-hidden">
-        <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-[#EA580C] via-[#F89020] to-cyan-400" />
+        <div className="absolute inset-x-0 top-0 h-[2px] bg-[#EA580C]" />
         <div className="text-left min-w-0 w-full">
           <div className="flex items-center gap-2 mb-2 flex-wrap">
             <TruckMorBadge />
             {isUrdu && <span className="text-[11px] font-bold uppercase tracking-widest text-emerald-300 bg-emerald-500/15 px-2.5 py-0.5 rounded-full border border-emerald-400/35 font-urdu">شاہراہِ پاکستان</span>}
-            <NazarBattuBadge />
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-2">
             <span>{isUrdu ? 'تاجر و کسٹمر پورٹل' : 'Business Shipping Panel'}</span>
@@ -548,10 +664,11 @@ export default function BusinessDashboard() {
       <div className="w-full max-w-full min-w-0 mb-6 sm:mb-8 relative z-10 overflow-x-auto touch-scroll no-scrollbar">
         <nav className="inline-flex min-w-full sm:min-w-0 items-center gap-1.5 p-1.5 rounded-2xl bg-[#0B1325]/96 border border-white/15 shadow-[0_12px_28px_rgba(0,0,0,0.45)]">
           {[
-            { id: 'new-request', name: 'New Request' },
-            { id: 'track', name: 'Track Shipments' },
-            { id: 'transporters', name: 'Transporters Directory' },
-            { id: 'history', name: 'History' }
+            { id: 'new-request', name: isUrdu ? 'کارگو پوسٹ کریں' : 'Post Cargo' },
+            { id: 'track', name: isUrdu ? 'کارگو ٹریکنگ' : 'Track Shipments' },
+            { id: 'transporters', name: isUrdu ? 'ٹرانسپورٹرز ڈائریکٹری' : 'Transporters Directory' },
+            { id: 'lost_cargo', name: isUrdu ? 'گمشدہ کارگو دعوے' : 'Missing Cargo Claims' },
+            { id: 'history', name: isUrdu ? 'تاریخچہ' : 'History' }
           ].map(tab => (
             <button
               key={tab.id}
@@ -564,7 +681,8 @@ export default function BusinessDashboard() {
                   : 'text-slate-300 hover:text-white hover:bg-white/[0.08]'
                 }`}
             >
-              {tab.name}
+              {tab.id === 'new-request' && <PostCargoIcon size={16} className="shrink-0" />}
+              <span>{tab.name}</span>
             </button>
           ))}
         </nav>
@@ -586,10 +704,17 @@ export default function BusinessDashboard() {
               {/* Step 1: SELECT TRANSPORTER */}
               <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-4 sm:p-6 space-y-4 overflow-hidden">
                 <div className="flex flex-wrap justify-between items-center gap-2">
-                  <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
-                    <span className="w-6 h-6 rounded-full bg-orange-600 text-white font-bold flex items-center justify-center text-xs shadow-2xs shrink-0">1</span>
-                    <span>{isUrdu ? 'ٹرانسپورٹر کا انتخاب' : 'Select Transporter'}</span>
-                  </h3>
+                  <div>
+                    <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                      <span className="w-6 h-6 rounded-full bg-orange-600 text-white font-bold flex items-center justify-center text-xs shadow-2xs shrink-0">1</span>
+                      <span>{isUrdu ? 'ٹرانسپورٹر کا انتخاب' : 'Select Transporter'}</span>
+                    </h3>
+                    <p className="text-[11px] text-slate-500 font-medium mt-1">
+                      {isUrdu 
+                        ? `قریب ترین ٹرانسپورٹرز اوپر دکھائے جا رہے ہیں (${step1ReferenceCity})` 
+                        : `Sorted by proximity to ${step1ReferenceCity}: Closest local carriers shown first`}
+                    </p>
+                  </div>
                   {selectedTransporter && (
                     <span className="text-xs font-mono text-orange-700 bg-orange-50 px-2.5 py-1 rounded-lg border border-orange-200 font-bold shadow-2xs max-w-full truncate">
                       Selected: {selectedTransporter.name}
@@ -605,40 +730,58 @@ export default function BusinessDashboard() {
                 )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {transporters.map(t => (
-                    <div
-                      key={t._id}
-                      onClick={() => {
-                        setSelectedTransporter(t);
-                        if (formErrors.transporter) {
-                          setFormErrors(prev => {
-                            const copy = { ...prev };
-                            delete copy.transporter;
-                            return copy;
-                          });
-                        }
-                      }}
-                      className={`p-4 sm:p-5 rounded-2xl border text-left cursor-pointer transition-all duration-300 relative overflow-hidden ${selectedTransporter?._id === t._id
-                          ? 'bg-orange-50/50 border-2 border-orange-600 shadow-sm -translate-y-0.5'
-                          : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
+                  {sortedTransportersForStep1.map(t => {
+                    const isSelected = selectedTransporter?._id === t._id;
+                    const isLocal = t._proximityDistance === 0;
+                    return (
+                      <div
+                        key={t._id}
+                        onClick={() => {
+                          setSelectedTransporter(t);
+                          if (formErrors.transporter) {
+                            setFormErrors(prev => {
+                              const copy = { ...prev };
+                              delete copy.transporter;
+                              return copy;
+                            });
+                          }
+                        }}
+                        className={`p-4 sm:p-5 rounded-2xl border text-left cursor-pointer transition-all duration-300 relative overflow-hidden ${
+                          isSelected
+                            ? 'bg-orange-50/50 border-2 border-orange-600 shadow-sm -translate-y-0.5'
+                            : isLocal
+                              ? 'bg-emerald-50/20 border-emerald-300 hover:border-emerald-400 hover:shadow-xs'
+                              : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
                         }`}
-                    >
-                      {selectedTransporter?._id === t._id && (
-                        <div className="absolute top-0 left-0 bottom-0 w-1 bg-[#F89020]" />
-                      )}
-                      <div className="flex justify-between items-start gap-2">
-                        <div className="min-w-0 flex-1">
-                          <h4 className="font-bold text-slate-900 text-base truncate">{t.name}</h4>
-                          <p className="text-xs text-slate-600 mt-1 font-mono">{t.phone || 'Contact via portal'} &middot; {t.shipmentsCount || 0} shipments</p>
-                          <p className="text-[11px] text-slate-500 mt-3 font-medium">{t.businessName ? `${t.businessName} · Verified Network` : 'Verified National Carrier'}</p>
+                      >
+                        {isSelected && (
+                          <div className="absolute top-0 left-0 bottom-0 w-1 bg-[#F89020]" />
+                        )}
+                        <div className="flex justify-between items-start gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="font-bold text-slate-900 text-base truncate">{t.name}</h4>
+                              {t._proximityBadge && (
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border font-mono shadow-2xs shrink-0 ${t._proximityBadge.className}`}>
+                                  {t._proximityBadge.text}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-600 mt-1 font-mono">
+                              {t.phone || 'Contact via portal'} &middot; {t.shipmentsCount || 0} shipments &middot; <span className="font-bold text-slate-800">Hub: {t.city || 'Lahore'}</span>
+                            </p>
+                            <p className="text-[11px] text-slate-500 mt-2.5 font-medium">
+                              {t.businessName ? `${t.businessName} · Verified Network` : 'Verified National Carrier'}
+                            </p>
+                          </div>
+                          <span className="text-xs font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200 font-mono shadow-2xs shrink-0">
+                            {getTransporterRating(t.shipmentsCount || 0)}
+                          </span>
                         </div>
-                        <span className="text-xs font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200 font-mono shadow-2xs shrink-0">
-                          {getTransporterRating(t.shipmentsCount || 0)}
-                        </span>
                       </div>
-                    </div>
-                  ))}
-                  {transporters.length === 0 && (
+                    );
+                  })}
+                  {sortedTransportersForStep1.length === 0 && (
                     <div className="col-span-full text-center py-8 px-4 text-slate-500 italic bg-slate-50 rounded-2xl border border-slate-200">
                       No transporters available. Please verify registered transporters in Admin panel.
                     </div>
@@ -1003,7 +1146,8 @@ export default function BusinessDashboard() {
                         </button>
                       )}
                       <h5 className="text-xs font-bold text-slate-800 border-b border-slate-200 pb-2 select-none flex items-center gap-2">
-                        <MapPin className="text-orange-600" size={14} /> Consignee Destination {idx + 1}
+                        <GpsMapPin size={14} className="shrink-0" />
+                        <span>Consignee Destination {idx + 1}</span>
                       </h5>
 
                       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -1118,11 +1262,11 @@ export default function BusinessDashboard() {
                 </div>
               </div>
 
-              {/* Step 5: SPECIAL HANDLING, TAX ID, RATE TYPE & LIVE TARIFF CALCULATOR */}
+              {/* Step 5: SPECIAL HANDLING, TAX ID, RATE TYPE & CUSTOM FREIGHT OFFER */}
               <div className="bg-white border border-slate-200 shadow-sm rounded-2xl p-4 sm:p-6 space-y-5 sm:space-y-6 overflow-hidden">
                 <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
                   <span className="w-6 h-6 rounded-full bg-orange-600 text-white font-bold flex items-center justify-center text-xs shadow-2xs">5</span>
-                  {isUrdu ? 'خصوصی ہدایات، ٹیکس اور کرایہ کا تخمینہ' : 'Special Handling, NTN & Automated Fare Tariff'}
+                  {isUrdu ? 'خصوصی ہدایات، ٹیکس اور کرایہ کی پیشکش' : 'Special Handling, NTN & Custom Freight Offer'}
                 </h3>
 
                 {/* Special Handling Badges Checkboxes */}
@@ -1236,43 +1380,163 @@ export default function BusinessDashboard() {
                   </div>
                 </div>
 
-                {/* Dynamic Tariff & Automated Fare Quotation Breakdown Card */}
-                <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 text-white shadow-sm relative overflow-hidden">
+                {/* Direct Customer Fare Offer & Price Negotiation */}
+                <div className="bg-gradient-to-br from-orange-500/[0.04] via-slate-50 to-amber-500/[0.05] dark:from-[#0B1325] dark:to-[#12203B] border-2 border-orange-500/30 dark:border-orange-500/40 rounded-2xl p-4 sm:p-5 text-slate-900 dark:text-white shadow-sm relative overflow-hidden">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-4">
-                    <div className="flex items-center gap-2">
-                      <Calculator size={18} className="text-[#F89020]" />
-                      <h4 className="text-xs font-mono font-bold text-slate-200 uppercase tracking-wider">
-                        Automated Highway Freight Tariff & Quotation
-                      </h4>
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-xl bg-orange-100 dark:bg-orange-950/60 border border-orange-300 dark:border-orange-500/40 text-[#EA580C] flex items-center justify-center shrink-0 shadow-2xs">
+                        <Handshake size={20} />
+                      </div>
+                      <div>
+                        <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                          {isUrdu ? 'کرایہ کی پیشکش اور گفت و شنید' : 'Direct Freight Offer & Price Negotiation'}
+                        </h4>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                          {isUrdu ? 'تجویز کردہ مارکیٹ کرایہ دیکھ کر اپنی پیشکش درج کریں۔ ٹرانسپورٹر اسے قبول کر سکتا ہے یا جوابی پیشکش دے سکتا ہے۔' : 'Enter your proposed freight fare based on the recommended rate. Transporter can accept or counter-offer.'}
+                        </p>
+                      </div>
                     </div>
-                    <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-500/40">
-                      NHA Distance Matrix: {tariffQuote.distanceKm} km
+                    <span className="text-[10px] font-mono font-bold text-orange-700 dark:text-orange-300 bg-orange-100 dark:bg-orange-950/80 px-2.5 py-1 rounded-lg border border-orange-300 dark:border-orange-500/40 shrink-0">
+                      {hasRouteSpecified ? (
+                        `📍 ${pickupCity} → ${deliveryCity} (${estDistance} km Route)`
+                      ) : pickupCity ? (
+                        `📍 From ${pickupCity} (${estDistance} km Est.)`
+                      ) : deliveryCity ? (
+                        `📍 To ${deliveryCity} (${estDistance} km Est.)`
+                      ) : (
+                        `📍 ${originCity} → ${destinationCity} (${estDistance} km Est.)`
+                      )}
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-mono">
-                    <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/60">
-                      <span className="text-[9px] text-slate-400 uppercase block">Base Freight</span>
-                      <span className="text-white font-bold text-sm">{tariffQuote.formatted.base}</span>
-                      <span className="text-[9px] text-slate-500 block mt-0.5">Rs. 45/Ton-km × {tariffQuote.vehicleMultiplier}x</span>
+                  {/* Recommended Market Benchmark Tariff Banner */}
+                  <div className="bg-gradient-to-r from-orange-500/[0.08] via-amber-500/[0.06] to-transparent dark:from-orange-950/50 dark:to-slate-900/40 border border-orange-300/80 dark:border-orange-500/40 rounded-xl p-3.5 sm:p-4 mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-orange-900 dark:text-orange-300 font-mono">
+                          {isUrdu ? 'تجویز کردہ مارکیٹ کرایہ (Standard Benchmark):' : 'Recommended Standard Market Tariff:'}
+                        </span>
+                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-orange-100 dark:bg-orange-900/60 text-orange-800 dark:text-orange-200 border border-orange-300 dark:border-orange-600/40 font-mono">
+                          {vehicleTypeChoice} &bull; {formatWeightTons(chargeableWeight)}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">
+                        {hasRouteSpecified ? (
+                          isUrdu ? `${pickupCity} سے ${deliveryCity} کا سرکاری ہائی وے کرایہ برائے ${estDistance} کلومیٹر` : `NHA rate calculation for ${pickupCity} to ${deliveryCity} (${estDistance} km highway haul)`
+                        ) : (
+                          isUrdu ? 'راستہ، وزن اور گاڑی کے مطابق متوقع کرایہ' : `Estimated tariff based on ${estDistance} km road distance & cargo specs`
+                        )}
+                      </p>
+                    </div>
+                    <div className="flex sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-1 shrink-0">
+                      <span className="text-xl sm:text-2xl font-black text-orange-600 dark:text-[#F89020] font-mono tabular-nums">
+                        Rs. {recommendedFare.toLocaleString()}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCustomerOfferFare(String(recommendedFare));
+                          setHasUserManuallyEditedOffer(true);
+                        }}
+                        className="text-[11px] font-bold text-orange-700 dark:text-orange-300 hover:text-orange-900 dark:hover:text-white underline cursor-pointer"
+                      >
+                        {isUrdu ? 'یہ کرایہ لاگو کریں' : 'Apply Standard Tariff'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="bg-white dark:bg-slate-900/90 p-4 sm:p-5 rounded-xl border border-orange-200/80 dark:border-slate-700/80 shadow-2xs space-y-4">
+                    <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                      <div className="flex-1 w-full">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <label className="block text-xs font-extrabold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
+                            {isUrdu ? 'آپ کا تجویز کردہ کرایہ (Your Proposed Offer) *' : 'Your Proposed Fare Offer (PKR) *'}
+                          </label>
+                          {Number(customerOfferFare) > 0 && Number(customerOfferFare) !== recommendedFare && (
+                            <span className="text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400">
+                              {Number(customerOfferFare) > recommendedFare 
+                                ? `(+Rs. ${(Number(customerOfferFare) - recommendedFare).toLocaleString()} above standard)`
+                                : `(-Rs. ${(recommendedFare - Number(customerOfferFare)).toLocaleString()} below standard)`}
+                            </span>
+                          )}
+                        </div>
+                        <div className="relative rounded-xl shadow-2xs">
+                          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-orange-600 font-bold font-mono text-base">
+                            Rs.
+                          </div>
+                          <input
+                            type="number"
+                            min="1000"
+                            step="500"
+                            value={customerOfferFare}
+                            onChange={(e) => {
+                              setCustomerOfferFare(e.target.value);
+                              setHasUserManuallyEditedOffer(true);
+                            }}
+                            placeholder={String(recommendedFare)}
+                            className="w-full pl-12 pr-4 py-3 rounded-xl border-2 border-orange-400 focus:border-orange-600 focus:ring-2 focus:ring-orange-200 dark:focus:ring-orange-900/50 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono font-bold text-lg outline-none transition-all"
+                          />
+                        </div>
+                        {formErrors.offer && (
+                          <p className="text-[11px] text-red-600 mt-1 font-semibold">{formErrors.offer}</p>
+                        )}
+                      </div>
+
+                      {/* Dynamic offer presets relative to this delivery */}
+                      <div className="w-full md:w-auto">
+                        <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
+                          {isUrdu ? 'تیز ترین پیشکشیں (Presets):' : 'Quick Offer Presets:'}
+                        </span>
+                        <div className="flex flex-wrap gap-2">
+                          {bargainingPresets.map((preset) => {
+                            const isRec = preset === recommendedFare;
+                            const isSelected = String(customerOfferFare) === String(preset);
+                            return (
+                              <button
+                                key={preset}
+                                type="button"
+                                onClick={() => {
+                                  setCustomerOfferFare(String(preset));
+                                  setHasUserManuallyEditedOffer(true);
+                                }}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold border transition-all cursor-pointer ${
+                                  isSelected
+                                    ? 'bg-orange-600 text-white border-orange-600 shadow-xs scale-105'
+                                    : isRec
+                                      ? 'bg-orange-50 dark:bg-orange-950/60 text-orange-800 dark:text-orange-200 border-orange-300 dark:border-orange-500/50 hover:bg-orange-100'
+                                      : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-700 hover:border-orange-400'
+                                }`}
+                              >
+                                Rs. {preset.toLocaleString()} {isRec ? ' ★' : ''}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/60">
-                      <span className="text-[9px] text-slate-400 uppercase block">Fuel Surcharge (8%)</span>
-                      <span className="text-slate-200 font-bold text-sm">{tariffQuote.formatted.fuel}</span>
-                      <span className="text-[9px] text-slate-500 block mt-0.5">National Fuel Index</span>
-                    </div>
-
-                    <div className="bg-slate-800/80 p-3 rounded-xl border border-slate-700/60">
-                      <span className="text-[9px] text-slate-400 uppercase block">Sales Tax (16% PRA/SRB)</span>
-                      <span className="text-slate-200 font-bold text-sm">{tariffQuote.formatted.tax}</span>
-                      <span className="text-[9px] text-slate-500 block mt-0.5">Provincial Services Tax</span>
-                    </div>
-
-                    <div className="bg-orange-950/40 p-3 rounded-xl border border-orange-500/40 flex flex-col justify-between">
-                      <span className="text-[10px] text-orange-300 font-bold uppercase tracking-wider">Total Tariff Estimate</span>
-                      <span className="text-[#F89020] font-black text-lg">{tariffQuote.formatted.total}</span>
-                      <span className="text-[9px] text-emerald-400 font-bold">{paymentTerms.toUpperCase()} &middot; {rateType.toUpperCase()}</span>
+                    {/* Quick Increment Buttons tailored to delivery fare */}
+                    <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                      <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                        {isUrdu ? 'کرایہ بڑھائیں:' : 'Quick Increase:'}
+                      </span>
+                      {quickIncrements.map((inc) => (
+                        <button
+                          key={inc}
+                          type="button"
+                          onClick={() => {
+                            const current = parseFloat(customerOfferFare) || recommendedFare;
+                            setCustomerOfferFare(String(current + inc));
+                            setHasUserManuallyEditedOffer(true);
+                          }}
+                          className="px-2.5 py-1 rounded-md text-[11px] font-mono font-bold bg-orange-50 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-500/30 hover:bg-orange-100 transition-colors cursor-pointer"
+                        >
+                          +{inc.toLocaleString()}
+                        </button>
+                      ))}
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 ml-auto font-medium">
+                        {isUrdu ? '💡 ٹرانسپورٹر روانگی سے قبل آپ کی پیشکش کا جائزہ لے گا' : '💡 Transporter will review your proposed fare before confirming dispatch.'}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -1302,8 +1566,8 @@ export default function BusinessDashboard() {
                   disabled={isSubmitting}
                   className="flex-1 btn-primary text-white font-extrabold py-3.5 rounded-xl text-sm shadow-md flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
                 >
-                  {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-                  <span>{isSubmitting ? 'Submitting...' : (isUrdu ? 'ٹرانسپورٹر کو بھیجیں' : 'Submit to Transporter')}</span>
+                  {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <PostCargoIcon size={18} className="shrink-0" />}
+                  <span>{isSubmitting ? 'Submitting...' : (isUrdu ? 'کارگو پوسٹ کریں' : 'Post Cargo Request')}</span>
                 </button>
                 <button
                   type="button"
@@ -1321,11 +1585,10 @@ export default function BusinessDashboard() {
           {/* TRACK SHIPMENTS TAB */}
           {activeTab === 'track' && (
             <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <h3 className="text-xs font-bold text-slate-600 tracking-wider uppercase text-left font-sans">
+              <div className="flex justify-between items-center mb-1">
+                <h3 className="text-xs font-bold text-slate-600 dark:text-slate-300 tracking-wider uppercase text-left font-sans">
                   {cargoList.filter(c => c.status !== 'Completed').length} active shipments in network
                 </h3>
-                <UrduMotto />
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[450px]">
@@ -1403,14 +1666,15 @@ export default function BusinessDashboard() {
                         <div className="flex flex-wrap justify-between items-start border-b border-slate-200 pb-4 gap-2">
                           <div className="min-w-0 flex-1 pr-2">
                             <div className="flex items-center gap-2 mb-1">
-                              <TruckTaj className="text-orange-600 w-5 h-4 shrink-0" />
-                              <span className="text-[10px] font-bold text-orange-700 uppercase tracking-wider">
-                                {isUrdu ? 'لائیو ٹیلی میٹری ٹریکنگ' : 'Live Telemetry Track'}
+                              <span className="text-[10px] font-bold text-orange-700 uppercase tracking-wider flex items-center gap-1.5">
+                                <GpsMapPin size={11} className="shrink-0" />
+                                <span>{isUrdu ? 'لائیو ٹیلی میٹری ٹریکنگ' : 'Live Telemetry Track'}</span>
                               </span>
                             </div>
                             <h3 className="text-lg sm:text-xl font-bold text-slate-900 break-words">{selectedCargo.title}</h3>
-                            <p className="text-xs text-slate-600 mt-1">
-                              {isUrdu ? 'منزل:' : 'Destination Hub:'} <span className="text-slate-900 font-bold">{selectedCargo.destination}</span>
+                            <p className="text-xs text-slate-600 mt-1 flex items-center gap-1.5">
+                              <GpsMapPin size={12} className="shrink-0" />
+                              <span>{isUrdu ? 'منزل:' : 'Destination Hub:'} <strong className="text-slate-900 font-bold">{selectedCargo.destination}</strong></span>
                             </p>
                           </div>
                           <div className="flex flex-wrap items-center gap-2 shrink-0">
@@ -1437,6 +1701,15 @@ export default function BusinessDashboard() {
                                 <span>{isUrdu ? 'بلٹی دیکھیں' : 'View e-Bilty'}</span>
                               </button>
                             )}
+                            <button
+                              type="button"
+                              onClick={() => setReportingCargo(selectedCargo)}
+                              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-red-50 text-red-700 hover:bg-red-100 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-900/50 border border-red-300 dark:border-red-800 flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs whitespace-nowrap"
+                              title="Report Missing, Undelivered or Damaged Cargo"
+                            >
+                              <AlertTriangle size={13} className="text-red-600 dark:text-red-400" />
+                              <span>{isUrdu ? 'گمشدگی / نقصان رپورٹ کریں' : 'Report Missing Cargo'}</span>
+                            </button>
                           </div>
                         </div>
 
@@ -1499,7 +1772,125 @@ export default function BusinessDashboard() {
                             <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Billing Terms</p>
                             <p className="font-semibold text-emerald-800 mt-0.5">{selectedCargo.paymentTerms || 'Prepaid'}</p>
                           </div>
-                          {/* If booking counter price or ETA exists, show it */}
+
+                          {/* Fare Bargaining & Counter-Offer Status Card */}
+                          <div className="col-span-full">
+                            {selectedCargo.counterFare && selectedCargo.counterBy === 'transporter' ? (
+                              <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/40 dark:to-orange-950/30 border-2 border-orange-400 dark:border-orange-500/50 p-4 sm:p-5 rounded-2xl shadow-md space-y-3">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <TrendingUp size={20} className="text-orange-600 animate-pulse shrink-0" />
+                                    <div>
+                                      <h4 className="text-sm font-extrabold text-orange-900 dark:text-orange-200">
+                                        {isUrdu ? 'ٹرانسپورٹر کی کرایہ بڑھانے کی پیشکش (Counter-Offer)' : 'Transporter Counter-Offered Higher Fare!'}
+                                      </h4>
+                                      <p className="text-xs text-orange-700 dark:text-orange-300">
+                                        {isUrdu ? 'ٹرانسپورٹر نے نیا کرایہ تجویز کیا ہے:' : 'Transporter proposed a revised fare:'}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="text-right">
+                                    <span className="text-xs text-slate-500 line-through mr-2">
+                                      Rs. {Number(selectedCargo.totalFare || selectedCargo.baseFare).toLocaleString()}
+                                    </span>
+                                    <span className="text-xl font-black font-mono text-orange-600 dark:text-orange-400">
+                                      Rs. {Number(selectedCargo.counterFare).toLocaleString()}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {selectedCargo.counterNote && (
+                                  <p className="text-xs text-slate-700 dark:text-slate-300 bg-white/70 dark:bg-slate-900/60 p-2.5 rounded-xl border border-orange-200 dark:border-orange-900/40 italic">
+                                    💬 "{selectedCargo.counterNote}"
+                                  </p>
+                                )}
+
+                                {!showReOfferInput ? (
+                                  <div className="flex flex-wrap gap-2.5 pt-1">
+                                    <button
+                                      type="button"
+                                      disabled={isBargainingAction}
+                                      onClick={() => handleCustomerAcceptCounter(selectedCargo)}
+                                      className="flex-1 btn-primary text-white text-xs sm:text-sm font-bold py-2.5 px-4 rounded-xl flex items-center justify-center gap-1.5 shadow-md cursor-pointer"
+                                    >
+                                      {isBargainingAction ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle size={16} />}
+                                      <span>{isUrdu ? 'ٹھیک ہے / پیشکش قبول کریں' : 'Accept Counter-Offer'} (Rs. {Number(selectedCargo.counterFare).toLocaleString()})</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setReOfferAmount(String(Math.round(((selectedCargo.totalFare || 0) + selectedCargo.counterFare) / 2)));
+                                        setShowReOfferInput(true);
+                                      }}
+                                      className="btn-outline text-xs sm:text-sm font-bold py-2.5 px-4 rounded-xl flex items-center justify-center gap-1.5 cursor-pointer text-slate-800 dark:text-slate-200"
+                                    >
+                                      <Repeat size={15} />
+                                      <span>{isUrdu ? 'مزید بارگیننگ کریں' : 'Counter Back / Re-Offer'}</span>
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="bg-white dark:bg-slate-900 p-3.5 rounded-xl border border-orange-300 dark:border-orange-500/50 space-y-2.5">
+                                    <label className="block text-xs font-bold text-slate-800 dark:text-slate-200">
+                                      {isUrdu ? 'اپنی جوابی پیشکش درج کریں (Re-Offer Fare):' : 'Enter Your Counter-Offer (PKR):'}
+                                    </label>
+                                    <div className="flex gap-2">
+                                      <input
+                                        type="number"
+                                        min="1000"
+                                        step="500"
+                                        value={reOfferAmount}
+                                        onChange={(e) => setReOfferAmount(e.target.value)}
+                                        className="flex-1 px-3 py-2 border rounded-xl font-mono font-bold text-sm bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:border-orange-500"
+                                      />
+                                      <button
+                                        type="button"
+                                        disabled={isBargainingAction}
+                                        onClick={() => handleCustomerReOffer(selectedCargo)}
+                                        className="btn-primary text-xs font-bold px-4 py-2 rounded-xl whitespace-nowrap cursor-pointer"
+                                      >
+                                        {isBargainingAction ? <Loader2 size={14} className="animate-spin" /> : (isUrdu ? 'بھیجیں' : 'Send Offer')}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setShowReOfferInput(false)}
+                                        className="btn-outline text-xs px-3 py-2 rounded-xl cursor-pointer"
+                                      >
+                                        {isUrdu ? 'منسوخ' : 'Cancel'}
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            ) : selectedCargo.fareStatus === 'Counter-Offered' && selectedCargo.counterBy === 'customer' ? (
+                              <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-500/40 p-3.5 rounded-xl flex items-center justify-between gap-3 text-xs">
+                                <div className="flex items-center gap-2 text-amber-900 dark:text-amber-200">
+                                  <Clock size={16} className="text-amber-600 shrink-0" />
+                                  <span>{isUrdu ? 'آپ کی جوابی پیشکش بھیج دی گئی ہے — ٹرانسپورٹر کے جواب کا انتظار ہے۔' : 'Your counter-offer has been sent. Awaiting Transporter response.'}</span>
+                                </div>
+                                <span className="font-mono font-bold text-amber-700 dark:text-amber-300 text-sm shrink-0">
+                                  Rs. {Number(selectedCargo.totalFare).toLocaleString()}
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-xl border border-slate-200 dark:border-slate-700/60 flex items-center justify-between gap-2 text-xs">
+                                <div>
+                                  <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-bold block">
+                                    {selectedCargo.status === 'Accepted' || selectedCargo.fareStatus === 'Agreed' ? '🤝 Agreed Fare' : '💬 Proposed Fare Offer'}
+                                  </span>
+                                  <span className="text-sm font-bold font-mono text-emerald-700 dark:text-emerald-400">
+                                    Rs. {Number(selectedCargo.totalFare || selectedCargo.baseFare || 0).toLocaleString()}
+                                  </span>
+                                </div>
+                                <span className={`text-[10px] font-bold px-2.5 py-1 rounded-md uppercase tracking-wider ${
+                                  selectedCargo.status === 'Accepted' || selectedCargo.fareStatus === 'Agreed'
+                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                    : 'bg-orange-50 text-orange-800 border border-orange-200'
+                                }`}>
+                                  {selectedCargo.status === 'Accepted' || selectedCargo.fareStatus === 'Agreed' ? 'Fare Locked' : 'Offer Pending'}
+                                </span>
+                              </div>
+                            )}
+                          </div>
                           {(() => {
                             const associatedBkg = bookings.find(b => Number(b.cargoId) === Number(selectedCargo.id || selectedCargo._id) && b.status !== 'Completed');
                             return associatedBkg ? (
@@ -1603,56 +1994,77 @@ export default function BusinessDashboard() {
           {/* TRANSPORTERS DIRECTORY TAB */}
           {activeTab === 'transporters' && (
             <div className="space-y-6 text-left">
-              <div className="flex flex-wrap justify-between items-center gap-2">
-                <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider">
-                  {transporters.length} verified transporters available
-                </h3>
-                <UrduMotto />
+              <div className="flex flex-wrap justify-between items-center gap-2 mb-1">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider">
+                    {transporters.length} verified transporters available
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    {isUrdu 
+                      ? `آپ کے شہر (${userCity}) کے قریب ترین ٹرانسپورٹرز اوپر دکھائے جا رہے ہیں` 
+                      : `Transporters nearest to your city (${userCity}) are prioritized at the top`}
+                  </p>
+                </div>
               </div>
 
               <div className="space-y-4">
-                {transporters.map(t => (
-                  <div key={t._id} className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm hover:shadow-md transition-all duration-200 relative overflow-hidden">
-                    <div className="flex items-start gap-3 sm:gap-4 relative z-10 min-w-0 flex-1">
-                      <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-orange-50 border border-orange-200 text-orange-700 flex items-center justify-center shrink-0 shadow-2xs">
-                        <Users size={22} />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h4 className="text-base sm:text-lg font-bold text-slate-900 tracking-wide break-words">{t.name}</h4>
-                          <span className="text-xs text-slate-700 font-bold bg-slate-100 px-2 py-0.5 rounded border border-slate-200 font-mono shadow-2xs shrink-0">
-                            {getTransporterRating(t.shipmentsCount || 0)}
-                          </span>
+                {sortedTransportersForDirectory.map(t => {
+                  const isLocal = t._proximityDistance === 0;
+                  return (
+                    <div key={t._id} className={`bg-white border rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm hover:shadow-md transition-all duration-200 relative overflow-hidden ${
+                      isLocal ? 'border-emerald-300 ring-1 ring-emerald-400/20' : 'border-slate-200'
+                    }`}>
+                      <div className="flex items-start gap-3 sm:gap-4 relative z-10 min-w-0 flex-1">
+                        <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-orange-50 border border-orange-200 text-orange-700 flex items-center justify-center shrink-0 shadow-2xs">
+                          <Users size={22} />
                         </div>
-                        <p className="text-xs text-slate-600 mt-1.5 font-mono break-all">
-                          {t.phone || '0300-1112223'} &middot; <span className="text-orange-700 font-sans font-semibold">{t.email}</span>
-                        </p>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h4 className="text-base sm:text-lg font-bold text-slate-900 tracking-wide break-words">{t.name}</h4>
+                            {t._proximityBadge && (
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border font-mono shadow-2xs shrink-0 ${t._proximityBadge.className}`}>
+                                {t._proximityBadge.text}
+                              </span>
+                            )}
+                            <span className="text-xs text-slate-700 font-bold bg-slate-100 px-2 py-0.5 rounded border border-slate-200 font-mono shadow-2xs shrink-0">
+                              {getTransporterRating(t.shipmentsCount || 0)}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-600 mt-1.5 font-mono break-all">
+                            {t.phone || '0300-1112223'} &middot; <span className="text-orange-700 font-sans font-semibold">{t.email}</span>
+                          </p>
 
-                        <div className="flex flex-wrap gap-1.5 mt-3 text-[10px] font-bold uppercase tracking-wide text-slate-600">
-                          <span className="bg-slate-100 border border-slate-200 px-2 py-0.5 rounded">Lahore</span>
-                          <span className="bg-slate-100 border border-slate-200 px-2 py-0.5 rounded">Karachi</span>
-                          <span className="bg-slate-100 border border-slate-200 px-2 py-0.5 rounded">Islamabad</span>
+                          <div className="flex flex-wrap items-center gap-2 mt-3 text-[10px] font-bold uppercase tracking-wide text-slate-600">
+                            <span className="bg-orange-50 text-orange-800 border border-orange-200 px-2.5 py-0.5 rounded-md font-mono">
+                              Base Hub: {t.city || 'Lahore'}
+                            </span>
+                            {t.businessName && (
+                              <span className="bg-slate-100 border border-slate-200 px-2 py-0.5 rounded">
+                                {t.businessName}
+                              </span>
+                            )}
+                          </div>
                         </div>
+                      </div>
+
+                      <div className="flex items-center justify-between md:justify-end gap-3 sm:gap-4 w-full md:w-auto shrink-0 relative z-10 pt-2 md:pt-0 border-t border-slate-200/70 md:border-t-0">
+                        <span className="text-xs sm:text-sm text-slate-600 font-bold font-mono">
+                          {t.shipmentsCount || 0} shipments
+                        </span>
+                        <button
+                          onClick={() => {
+                            setSelectedTransporter(t);
+                            setActiveTab('new-request');
+                          }}
+                          className="btn-primary px-4 py-2 text-xs shadow-sm transition-all shrink-0 whitespace-nowrap cursor-pointer"
+                        >
+                          Send Request
+                        </button>
                       </div>
                     </div>
-
-                    <div className="flex items-center justify-between md:justify-end gap-3 sm:gap-4 w-full md:w-auto shrink-0 relative z-10 pt-2 md:pt-0 border-t border-slate-200/70 md:border-t-0">
-                      <span className="text-xs sm:text-sm text-slate-600 font-bold font-mono">
-                        {t.shipmentsCount || 0} shipments
-                      </span>
-                      <button
-                        onClick={() => {
-                          setSelectedTransporter(t);
-                          setActiveTab('new-request');
-                        }}
-                        className="btn-primary px-4 py-2 text-xs shadow-sm transition-all shrink-0 whitespace-nowrap"
-                      >
-                        Send Request
-                      </button>
-                    </div>
-                  </div>
-                ))}
-                {transporters.length === 0 && (
+                  );
+                })}
+                {sortedTransportersForDirectory.length === 0 && (
                   <div className="bg-white border border-slate-200 rounded-2xl p-16 text-center text-slate-500 shadow-sm">
                     No verified transporters listed.
                   </div>
@@ -1684,6 +2096,7 @@ export default function BusinessDashboard() {
                         <th className="py-3 px-3">Weight</th>
                         <th className="py-3 px-3">Date</th>
                         <th className="py-3 px-3">Status</th>
+                        <th className="py-3 px-3 text-right">Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1713,11 +2126,20 @@ export default function BusinessDashboard() {
                                 DELIVERED
                               </span>
                             </td>
+                            <td className="py-4 px-3 text-right whitespace-nowrap">
+                              <button
+                                type="button"
+                                onClick={() => setReportingCargo(c)}
+                                className="px-2.5 py-1 text-[11px] font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 rounded-lg border border-red-200 transition-colors cursor-pointer"
+                              >
+                                Report Issue
+                              </button>
+                            </td>
                           </tr>
                         ))}
                       {cargoList.filter(c => c.status === 'Completed').length === 0 && (
                         <tr>
-                          <td colSpan="7" className="text-center py-12 text-slate-500 italic">No completed delivery history found.</td>
+                          <td colSpan="8" className="text-center py-12 text-slate-500 italic">No completed delivery history found.</td>
                         </tr>
                       )}
                     </tbody>
@@ -1727,8 +2149,24 @@ export default function BusinessDashboard() {
             </div>
           )}
 
+          {/* LOST & MISSING CARGO CLAIMS TAB */}
+          {activeTab === 'lost_cargo' && (
+            <LostCargoPortal userRole="business" currentUserId={userData?.id || currentUser?.id} />
+          )}
+
         </div>
       )}
+
+      {/* Report Missing Cargo Modal */}
+      <ReportMissingCargoModal
+        isOpen={Boolean(reportingCargo)}
+        onClose={() => setReportingCargo(null)}
+        cargo={reportingCargo}
+        onReportSuccess={() => {
+          fetchData();
+          setActiveTab('lost_cargo');
+        }}
+      />
 
       {/* Official Bilty Preview & Print Modal */}
       <BiltyModal

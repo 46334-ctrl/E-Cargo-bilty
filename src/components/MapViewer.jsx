@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, ZoomControl, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import { Navigation, Radio, Truck, MapPin, Phone, User, CheckCircle, Layers, Clock, ShieldCheck } from 'lucide-react';
+import { Radio, Truck, Phone, User, CheckCircle, Layers, Clock, ShieldCheck } from 'lucide-react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import GpsMapPin from './GpsMapPin';
 import { ChamakRibbon } from './TruckArt';
 import { useLanguage } from '../contexts/LanguageContext';
 
@@ -73,7 +74,7 @@ export const getCoordinatesForLocation = (loc, fallback = [31.5204, 74.3587]) =>
   return fallback;
 };
 
-// Create a custom Pakistani Truck-Art GPS marker with pulsing ring, crown accent and plate label
+// Create a custom GPS marker with Google Maps pin, pulsing wave and plate label
 export const createCustomIcon = (color, label = '') => {
   const accentColor = 
     color === 'neon-blue' || color === 'teal' || color === 'cyan' ? '#F89020' : 
@@ -82,23 +83,28 @@ export const createCustomIcon = (color, label = '') => {
     '#F89020';
   
   const iconMarkup = renderToStaticMarkup(
-    <div className="relative flex flex-col items-center justify-center -mt-4 -ml-4 pointer-events-auto">
-      {/* Outer Pulsing Ring */}
+    <div className="relative flex flex-col items-center justify-end pointer-events-auto select-none" style={{ width: '42px', height: '58px' }}>
+      {/* Outer Pulsing Ground Wave */}
       <div 
-        className="absolute w-8 h-8 rounded-full animate-ping opacity-60"
+        className="absolute bottom-1 w-6 h-2 rounded-full animate-ping opacity-75 pointer-events-none"
         style={{ backgroundColor: accentColor }}
       />
-      {/* Decorative Ornate Border */}
-      <div 
-        className="relative flex items-center justify-center w-8 h-8 rounded-full bg-slate-900 border-2 shadow-md"
-        style={{ borderColor: accentColor }}
-      >
-        <Navigation size={14} className="rotate-45" style={{ color: accentColor }} />
-        {/* Status center dot on top */}
-        <div className="absolute -top-1.5 w-2 h-2 rounded-full bg-[#F89020] border border-white shadow-xs"></div>
+      {/* Ground shadow beneath the pin */}
+      <div className="absolute bottom-1 w-5 h-1.5 rounded-full bg-black/40 blur-[1px] pointer-events-none" />
+      {/* Google Maps Pin Logo */}
+      <div className="relative flex items-center justify-center filter drop-shadow-[0_4px_6px_rgba(0,0,0,0.5)] hover:scale-110 transition-transform mb-0.5">
+        <img 
+          src="/images/map-pin.webp" 
+          alt="GPS Location Marker" 
+          className="w-7 h-10 object-contain block"
+          style={{ width: '28px', height: '40px' }}
+        />
       </div>
       {label && (
-        <span className="mt-1 px-1.5 py-0.5 rounded bg-slate-900/95 text-[9px] font-mono font-bold text-orange-300 border border-orange-500/40 whitespace-nowrap shadow-md">
+        <span 
+          className="px-1.5 py-0.5 rounded bg-slate-900/95 text-[9px] font-mono font-bold border whitespace-nowrap shadow-md pointer-events-none"
+          style={{ borderColor: accentColor, color: color === 'emerald' ? '#6EE7B7' : color === 'rose' ? '#FDA4AF' : '#FDBA74' }}
+        >
           {label}
         </span>
       )}
@@ -108,9 +114,9 @@ export const createCustomIcon = (color, label = '') => {
   return L.divIcon({
     html: iconMarkup,
     className: 'custom-leaflet-icon',
-    iconSize: [36, 46],
-    iconAnchor: [18, 23],
-    popupAnchor: [0, -22]
+    iconSize: [42, 58],
+    iconAnchor: [21, 54],
+    popupAnchor: [0, -50]
   });
 };
 
@@ -171,16 +177,16 @@ export default function MapViewer({
   if (!defaultIcon) return null;
 
   return (
-    <div className="w-full rounded-2xl overflow-hidden border border-slate-700/80 shadow-2xl relative bg-[#070A11]" style={{ height }}>
+    <div className="w-full rounded-2xl overflow-hidden border border-slate-300 dark:border-slate-700/80 shadow-xl relative bg-slate-100 dark:bg-[#070A11]" style={{ height }}>
       {/* Top Left: Map Style Selector (100% Free, Zero API Key Required) */}
-      <div className="absolute top-3 left-3 z-[450] bg-slate-900/95 border border-slate-700/80 rounded-lg p-0.5 flex items-center gap-1 shadow-lg text-[10px] font-mono">
+      <div className="absolute top-3 left-3 z-[450] bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-700/80 rounded-lg p-0.5 flex items-center gap-1 shadow-lg text-[10px] font-mono">
         <button
           type="button"
           onClick={() => setMapStyle('streets')}
           className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
             mapStyle === 'streets' 
               ? 'bg-[#F89020] text-slate-950 font-bold shadow-xs' 
-              : 'text-slate-300 hover:text-white'
+              : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
           }`}
           title="Esri World Street Map (No API Key)"
         >
@@ -192,7 +198,7 @@ export default function MapViewer({
           className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
             mapStyle === 'roads' 
               ? 'bg-[#F89020] text-slate-950 font-bold shadow-xs' 
-              : 'text-slate-300 hover:text-white'
+              : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
           }`}
           title="Humanitarian OpenStreetMap (No API Key)"
         >
@@ -204,7 +210,7 @@ export default function MapViewer({
           className={`px-2 py-0.5 rounded transition-all cursor-pointer ${
             mapStyle === 'satellite' 
               ? 'bg-[#F89020] text-slate-950 font-bold shadow-xs' 
-              : 'text-slate-300 hover:text-white'
+              : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
           }`}
           title="Satellite Imagery (No API Key)"
         >
@@ -213,36 +219,37 @@ export default function MapViewer({
       </div>
 
       {/* Radar telemetry badge overlay */}
-      <div className="hidden sm:flex absolute top-3 right-14 z-[450] bg-slate-900/95 border border-orange-500/40 rounded-lg px-2.5 py-1.5 items-center gap-2 text-[10px] font-mono text-orange-300 shadow-lg">
-        <Radio size={13} className="text-[#F89020] animate-pulse shrink-0" />
+      <div className="hidden sm:flex absolute top-3 right-14 z-[450] bg-white/95 dark:bg-slate-900/95 border border-orange-200 dark:border-orange-500/40 rounded-lg px-2.5 py-1.5 items-center gap-2 text-[10px] font-mono text-orange-700 dark:text-orange-300 shadow-lg">
+        <GpsMapPin size={13} className="shrink-0" />
         <span className="font-bold tracking-wider">
           {trucks ? `FLEET RADAR • ${trucks.length} TRUCKS` : (title || (route ? `ROUTE: ${route.origin} → ${route.destination}` : 'LIVE TELEMETRY ACTIVE'))}
         </span>
-        <span className="text-gray-500">•</span>
-        <span className={isUrdu ? "font-urdu text-[11px] text-orange-400 font-bold" : "font-sans font-bold text-[10px] text-emerald-400 uppercase tracking-widest"}>
-          {isUrdu ? 'سفرِ خیر' : 'LIVE GPS'}
+        <span className="text-gray-400 dark:text-gray-500">•</span>
+        <span className={isUrdu ? "font-urdu text-[11px] text-orange-600 dark:text-orange-400 font-bold flex items-center gap-1" : "font-sans font-bold text-[10px] text-emerald-600 dark:text-emerald-400 uppercase tracking-widest flex items-center gap-1"}>
+          <GpsMapPin size={11} className="shrink-0" />
+          <span>{isUrdu ? 'سفرِ خیر' : 'LIVE GPS'}</span>
         </span>
       </div>
 
       {/* Driver & Telemetry Banner for Active Shipments */}
       {route && (route.driverName || route.eta) && (
-        <div className="absolute bottom-3 left-3 right-3 z-[450] bg-slate-900/96 border border-orange-500/50 rounded-xl p-2.5 shadow-xl flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div className="absolute bottom-3 left-3 right-3 z-[450] bg-white/98 dark:bg-slate-900/96 border border-slate-200 dark:border-orange-500/50 rounded-xl p-2.5 shadow-xl flex flex-wrap items-center justify-between gap-3 text-xs text-slate-900 dark:text-slate-100">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-orange-500/20 border border-orange-400/40 flex items-center justify-center text-orange-300">
+            <div className="w-8 h-8 rounded-lg bg-orange-500/15 dark:bg-orange-500/20 border border-orange-400/40 flex items-center justify-center text-orange-600 dark:text-orange-300">
               <Truck size={16} />
             </div>
             <div>
-              <p className="font-mono font-bold text-orange-300 text-xs">
+              <p className="font-mono font-bold text-orange-700 dark:text-orange-300 text-xs">
                 {route.truckPlate || 'Assigned Carrier'}
               </p>
-              <p className="text-[11px] text-slate-300 flex items-center gap-1.5">
-                <User size={11} className="text-orange-400 shrink-0" />
+              <p className="text-[11px] text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+                <User size={11} className="text-orange-500 dark:text-orange-400 shrink-0" />
                 <span>{route.driverName || 'Driver'}</span>
                 {route.driverMobile && (
                   <>
-                    <span className="text-slate-500">•</span>
-                    <Phone size={11} className="text-emerald-400 shrink-0" />
-                    <span className="font-mono text-emerald-300">{route.driverMobile}</span>
+                    <span className="text-slate-400 dark:text-slate-500">•</span>
+                    <Phone size={11} className="text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <span className="font-mono text-emerald-700 dark:text-emerald-300 font-bold">{route.driverMobile}</span>
                   </>
                 )}
               </p>
@@ -251,13 +258,14 @@ export default function MapViewer({
 
           <div className="flex items-center gap-2 font-mono">
             {route.eta && (
-              <div className="bg-slate-800/90 border border-orange-500/40 rounded-lg px-2.5 py-1 text-orange-300 text-[11px] flex items-center gap-1">
+              <div className="bg-slate-100 dark:bg-slate-800/90 border border-slate-200 dark:border-orange-500/40 rounded-lg px-2.5 py-1 text-orange-700 dark:text-orange-300 text-[11px] flex items-center gap-1">
                 <Clock size={12} className="text-[#F89020]" />
                 <span>ETA: <strong>{route.eta}</strong></span>
               </div>
             )}
-            <div className="bg-emerald-950/80 border border-emerald-500/40 rounded-lg px-2 py-1 text-emerald-300 text-[10px] flex items-center gap-1 font-bold">
-              <ShieldCheck size={11} /> NHA GPS Active
+            <div className="bg-emerald-50 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-500/40 rounded-lg px-2 py-1 text-emerald-800 dark:text-emerald-300 text-[10px] flex items-center gap-1.5 font-bold">
+              <GpsMapPin size={11} className="shrink-0" />
+              <span>NHA GPS Active</span>
             </div>
           </div>
         </div>
@@ -265,8 +273,9 @@ export default function MapViewer({
 
       {/* Bottom telemetry coordinates tag (when no route footer) */}
       {!route && (
-        <div className="absolute bottom-2 left-3 z-[450] bg-slate-900/92 border border-slate-700 rounded-md px-2 py-0.5 text-[9px] font-mono text-slate-300 pointer-events-none">
-          LAT: {center[0].toFixed(4)} | LNG: {center[1].toFixed(4)}
+        <div className="absolute bottom-2 left-3 z-[450] bg-white/95 dark:bg-slate-900/92 border border-slate-200 dark:border-slate-700 rounded-md px-2 py-0.5 text-[9px] font-mono text-slate-700 dark:text-slate-300 pointer-events-none shadow-xs flex items-center gap-1">
+          <GpsMapPin size={10} className="shrink-0" />
+          <span>LAT: {center[0].toFixed(4)} | LNG: {center[1].toFixed(4)}</span>
         </div>
       )}
 
@@ -295,8 +304,9 @@ export default function MapViewer({
             <Marker position={originCoords} icon={originIcon || defaultIcon}>
               <Popup className="futuristic-popup">
                 <div className="p-2.5 bg-slate-900 text-white rounded-xl min-w-[170px] border border-emerald-500/40">
-                  <div className="text-[10px] font-mono text-emerald-400 font-bold uppercase tracking-wider mb-1 flex items-center gap-1">
-                    <MapPin size={12} className="text-emerald-400" /> Dispatch Origin
+                  <div className="text-[10px] font-mono text-emerald-400 font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                    <GpsMapPin size={13} className="shrink-0" />
+                    <span>Dispatch Origin</span>
                   </div>
                   <p className="text-xs font-bold text-slate-200">{route.origin}</p>
                 </div>
@@ -307,8 +317,9 @@ export default function MapViewer({
             <Marker position={destCoords} icon={destIcon || defaultIcon}>
               <Popup className="futuristic-popup">
                 <div className="p-2.5 bg-slate-900 text-white rounded-xl min-w-[170px] border border-rose-500/40">
-                  <div className="text-[10px] font-mono text-rose-400 font-bold uppercase tracking-wider mb-1 flex items-center gap-1">
-                    <MapPin size={12} className="text-rose-400" /> Destination Hub
+                  <div className="text-[10px] font-mono text-rose-400 font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                    <GpsMapPin size={13} className="shrink-0" />
+                    <span>Destination Hub</span>
                   </div>
                   <p className="text-xs font-bold text-slate-200">{route.destination}</p>
                 </div>
@@ -319,8 +330,9 @@ export default function MapViewer({
             <Marker position={activeTruckCoords} icon={createCustomIcon('neon-blue', route.truckPlate || 'TRUCK')}>
               <Popup className="futuristic-popup">
                 <div className="p-3 bg-slate-900 text-white rounded-xl min-w-[200px] border border-orange-500/40">
-                  <div className="text-[10px] font-mono text-orange-400 font-bold uppercase tracking-wider mb-1 flex items-center gap-1">
-                    <Truck size={12} className="text-[#F89020]" /> Live In-Transit Telemetry
+                  <div className="text-[10px] font-mono text-orange-400 font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                    <GpsMapPin size={13} className="shrink-0" />
+                    <span>Live In-Transit Telemetry</span>
                   </div>
                   <p className="text-xs font-bold text-slate-200">{route.truckPlate || 'Carrier Unit'}</p>
                   <p className="text-[11px] text-slate-400 mt-1">Driver: {route.driverName || 'Verified'} ({route.driverMobile || 'GPS Linked'})</p>
@@ -355,8 +367,9 @@ export default function MapViewer({
               <Popup className="futuristic-popup">
                 <div className="p-3 bg-slate-900 text-white rounded-xl min-w-[210px] border border-orange-500/30">
                   <div className="flex justify-between items-center mb-1 pb-1 border-b border-slate-800">
-                    <span className="text-[10px] font-mono text-orange-400 font-black tracking-wider uppercase">
-                      {truck.plateNumber}
+                    <span className="text-[10px] font-mono text-orange-400 font-black tracking-wider uppercase flex items-center gap-1">
+                      <GpsMapPin size={11} className="shrink-0" />
+                      <span>{truck.plateNumber}</span>
                     </span>
                     <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase border ${
                       truck.status === 'Available'
@@ -371,7 +384,7 @@ export default function MapViewer({
                   
                   <div className="mt-2 space-y-1 text-[11px] text-slate-400">
                     <p className="flex items-center gap-1.5">
-                      <MapPin size={11} className="text-rose-400 shrink-0" />
+                      <GpsMapPin size={12} className="shrink-0" />
                       <span>{truck.loc}</span>
                     </p>
                     <p className="flex items-center gap-1.5">
@@ -400,13 +413,14 @@ export default function MapViewer({
           <Marker position={center} icon={defaultIcon}>
             <Popup className="futuristic-popup">
               <div className="p-3 bg-slate-900 text-white rounded-xl min-w-[200px] border border-orange-500/30">
-                <div className="text-[10px] font-mono text-orange-400 font-bold uppercase tracking-wider mb-1 flex items-center gap-1">
-                  <Truck size={12} className="text-[#F89020]" />
+                <div className="text-[10px] font-mono text-orange-400 font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                  <GpsMapPin size={13} className="shrink-0" />
                   <span>Live Vehicle Telemetry</span>
                 </div>
                 <div className="text-xs font-semibold text-slate-200">{popupText}</div>
-                <div className="text-[10px] font-mono text-emerald-400 mt-1 flex items-center gap-1">
-                  <CheckCircle size={10} /> GPS Signal: Verified Transponder
+                <div className="text-[10px] font-mono text-emerald-400 mt-1 flex items-center gap-1.5">
+                  <GpsMapPin size={11} className="shrink-0" />
+                  <span>GPS Signal: Verified Transponder</span>
                 </div>
               </div>
             </Popup>
