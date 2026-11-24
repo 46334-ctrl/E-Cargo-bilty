@@ -1013,7 +1013,7 @@ export default function TransporterDashboard() {
                               </div>
 
                               {/* Numeric breakdown */}
-                              <div className="flex justify-between items-center text-[10px] text-slate-500 font-mono">
+                              <div className="flex flex-wrap justify-between items-center gap-1 text-[10px] text-slate-500 font-mono">
                                 <span>Used: <strong className="text-slate-800">{used.toLocaleString()} kg</strong></span>
                                 <span className={isFull ? 'text-red-600 font-bold' : 'text-emerald-700 font-bold'}>
                                   {rem.toLocaleString()} kg left
@@ -1469,7 +1469,7 @@ export default function TransporterDashboard() {
                   />
                 </div>
 
-                <div className="flex justify-between items-center text-[11px] text-slate-600">
+                <div className="flex flex-wrap justify-between items-center gap-1.5 text-[11px] text-slate-600">
                   <p>
                     Depot: <span className="text-slate-900 font-medium">{selectedTruckForAssign.loc}</span> &bull; Driver: <span className="text-slate-900 font-medium">{selectedTruckForAssign.driverName}</span>
                     {assignOrigin && (

@@ -867,7 +867,7 @@ export default function TruckOwnerDashboard() {
                                       : `Available (${truck.fill_percentage || 0}% full)`}
                                 </span>
                               </div>
-                              <div className="text-[11px] font-mono text-slate-600">
+                              <div className="text-[11px] font-mono text-slate-600 flex flex-wrap items-center gap-1.5">
                                 <strong className="text-slate-900 font-bold">{(truck.used_capacity || 0).toLocaleString()} kg</strong> used /{' '}
                                 <strong className="text-emerald-700 font-bold">{(truck.remaining_capacity !== undefined ? truck.remaining_capacity : (truck.total_capacity || 0)).toLocaleString()} kg</strong> left{' '}
                                 <span className="text-slate-500 font-medium">(Total: {(truck.total_capacity || 0).toLocaleString()} kg)</span>
@@ -891,7 +891,7 @@ export default function TruckOwnerDashboard() {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3 shrink-0 self-end md:self-center">
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-3 shrink-0 self-start sm:self-end md:self-center mt-3 md:mt-0">
                         <button
                           onClick={() => setShowDocsModal(truck)}
                           className="btn-outline text-xs !py-1.5 !px-3"
