@@ -409,6 +409,9 @@ export default function LandingExplorerModal({
                         type="number"
                         min={1}
                         max={60}
+                        onKeyDown={(e) => {
+                          if (e.key === '-' || e.key === 'e' || e.key === 'E' || e.key === '+') e.preventDefault();
+                        }}
                         value={tons}
                         onChange={(e) => setTons(Math.max(1, Math.min(60, Number(e.target.value) || 1)))}
                         className="w-full rounded-xl bg-white dark:bg-[#080F1E] border border-slate-300 dark:border-white/15 px-3 py-2 text-xs font-mono text-slate-900 dark:text-white outline-none focus:border-orange-500"

@@ -219,6 +219,12 @@ export default function BusinessDashboard() {
 
   const handleProductChange = (idx, field, value) => {
     const updated = [...products];
+    // Sanitize numeric and dimensional fields to strictly prevent negative numbers and exponents
+    if (['qty', 'unitWeight', 'lengthCm', 'widthCm', 'heightCm'].includes(field)) {
+      if (typeof value === 'string') {
+        value = value.replace(/-/g, '').replace(/[eE]/g, '').trim();
+      }
+    }
     updated[idx][field] = value;
     setProducts(updated);
   };
@@ -241,8 +247,8 @@ export default function BusinessDashboard() {
   // Auto-calculated gross weight converting any unit (Kg, Ton, Maund, Quintal) into Metric Tons
   const calculateGrossWeight = () => {
     return products.reduce((sum, p) => {
-      const qty = parseFloat(p.qty) || 0;
-      const wtInTons = convertToTons(p.unitWeight, p.weightUnit || 'ton');
+      const qty = Math.max(0, parseFloat(p.qty) || 0);
+      const wtInTons = Math.max(0, convertToTons(p.unitWeight, p.weightUnit || 'ton'));
       return sum + (qty * wtInTons);
     }, 0);
   };
@@ -250,9 +256,9 @@ export default function BusinessDashboard() {
   // Auto-calculated volumetric weight with dimensional unit support
   const calculateTotalVolumetricWeight = () => {
     return products.reduce((sum, p) => {
-      let l = parseFloat(p.lengthCm) || 0;
-      let w = parseFloat(p.widthCm) || 0;
-      let h = parseFloat(p.heightCm) || 0;
+      let l = Math.max(0, parseFloat(p.lengthCm) || 0);
+      let w = Math.max(0, parseFloat(p.widthCm) || 0);
+      let h = Math.max(0, parseFloat(p.heightCm) || 0);
       if (p.dimensionUnit === 'meter') {
         l *= 100;
         w *= 100;
@@ -262,8 +268,9 @@ export default function BusinessDashboard() {
         w *= 30.48;
         h *= 30.48;
       }
-      const vol = calculateVolumetricWeight(l, w, h, p.qty);
-      return sum + vol.tons;
+      const q = Math.max(1, parseInt(p.qty) || 1);
+      const vol = calculateVolumetricWeight(l, w, h, q);
+      return sum + Math.max(0, vol.tons || 0);
     }, 0);
   };
 
@@ -869,6 +876,10 @@ export default function BusinessDashboard() {
                             <input
                               type="number"
                               min="1"
+                              step="1"
+                              onKeyDown={(e) => {
+                                if (e.key === '-' || e.key === 'e' || e.key === 'E' || e.key === '+' || e.key === '.') e.preventDefault();
+                              }}
                               value={prod.qty}
                               onChange={e => handleProductChange(idx, 'qty', e.target.value)}
                               className={`w-full bg-white border rounded-xl px-3 py-2 text-slate-900 text-xs outline-none font-mono transition-colors ${formErrors[`prod_${idx}_qty`] ? 'border-red-500 ring-2 ring-red-200' : 'border-slate-300 focus:border-orange-500'
@@ -929,7 +940,11 @@ export default function BusinessDashboard() {
                             </label>
                             <input
                               type="number"
+                              min="0"
                               step="any"
+                              onKeyDown={(e) => {
+                                if (e.key === '-' || e.key === 'e' || e.key === 'E' || e.key === '+') e.preventDefault();
+                              }}
                               value={prod.lengthCm || ''}
                               onChange={e => handleProductChange(idx, 'lengthCm', e.target.value)}
                               className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-slate-900 text-xs font-mono outline-none focus:border-orange-500"
@@ -942,7 +957,11 @@ export default function BusinessDashboard() {
                             </label>
                             <input
                               type="number"
+                              min="0"
                               step="any"
+                              onKeyDown={(e) => {
+                                if (e.key === '-' || e.key === 'e' || e.key === 'E' || e.key === '+') e.preventDefault();
+                              }}
                               value={prod.widthCm || ''}
                               onChange={e => handleProductChange(idx, 'widthCm', e.target.value)}
                               className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-slate-900 text-xs font-mono outline-none focus:border-orange-500"
@@ -955,7 +974,11 @@ export default function BusinessDashboard() {
                             </label>
                             <input
                               type="number"
+                              min="0"
                               step="any"
+                              onKeyDown={(e) => {
+                                if (e.key === '-' || e.key === 'e' || e.key === 'E' || e.key === '+') e.preventDefault();
+                              }}
                               value={prod.heightCm || ''}
                               onChange={e => handleProductChange(idx, 'heightCm', e.target.value)}
                               className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-slate-900 text-xs font-mono outline-none focus:border-orange-500"
@@ -1466,11 +1489,15 @@ export default function BusinessDashboard() {
                           </div>
                           <input
                             type="number"
-                            min="1000"
+                            min="0"
                             step="500"
+                            onKeyDown={(e) => {
+                              if (e.key === '-' || e.key === 'e' || e.key === 'E' || e.key === '+') e.preventDefault();
+                            }}
                             value={customerOfferFare}
                             onChange={(e) => {
-                              setCustomerOfferFare(e.target.value);
+                              const cleanVal = e.target.value.replace(/-/g, '').replace(/[eE]/g, '');
+                              setCustomerOfferFare(cleanVal);
                               setHasUserManuallyEditedOffer(true);
                             }}
                             placeholder={String(recommendedFare)}
@@ -1836,10 +1863,16 @@ export default function BusinessDashboard() {
                                     <div className="flex gap-2">
                                       <input
                                         type="number"
-                                        min="1000"
+                                        min="0"
                                         step="500"
+                                        onKeyDown={(e) => {
+                                          if (e.key === '-' || e.key === 'e' || e.key === 'E' || e.key === '+') e.preventDefault();
+                                        }}
                                         value={reOfferAmount}
-                                        onChange={(e) => setReOfferAmount(e.target.value)}
+                                        onChange={(e) => {
+                                          const cleanVal = e.target.value.replace(/-/g, '').replace(/[eE]/g, '');
+                                          setReOfferAmount(cleanVal);
+                                        }}
                                         className="flex-1 px-3 py-2 border rounded-xl font-mono font-bold text-sm bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white outline-none focus:border-orange-500"
                                       />
                                       <button

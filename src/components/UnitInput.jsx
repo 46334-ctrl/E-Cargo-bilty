@@ -32,6 +32,9 @@ export default function UnitInput({
   const activeUnit = selectedUnit !== undefined ? selectedUnit : unit;
 
   const handleValueChange = (val) => {
+    if (typeof val === 'string') {
+      val = val.replace(/-/g, '').replace(/[eE]/g, '');
+    }
     if (onValueChange) onValueChange(val);
     if (onChange) onChange(val);
   };
@@ -75,7 +78,10 @@ export default function UnitInput({
         <input
           type="number"
           step={step}
-          min={min}
+          min={min !== undefined ? min : "0"}
+          onKeyDown={(e) => {
+            if (e.key === '-' || e.key === 'e' || e.key === 'E' || e.key === '+') e.preventDefault();
+          }}
           value={value ?? ''}
           onChange={(e) => handleValueChange(e.target.value)}
           onBlur={onBlur}

@@ -553,6 +553,29 @@ app.post('/api/cargo', authMiddleware, async (req, res) => {
     } else if (req.user.role === 'transporter') {
       data.transporterId = req.user.id;
     }
+
+    // Defensively sanitize numeric values to prevent negative weights, dimensions, or fares
+    if (data.weight !== undefined) data.weight = Math.max(0, parseFloat(data.weight) || 0);
+    if (data.chargeableWeight !== undefined) data.chargeableWeight = Math.max(0, parseFloat(data.chargeableWeight) || 0);
+    if (data.baseFare !== undefined) data.baseFare = Math.max(0, parseFloat(data.baseFare) || 0);
+    if (data.totalFare !== undefined) data.totalFare = Math.max(0, parseFloat(data.totalFare) || 0);
+    if (data.counterFare !== undefined) data.counterFare = Math.max(0, parseFloat(data.counterFare) || 0);
+
+    if (data.products) {
+      let prods = Array.isArray(data.products) ? data.products : safeParseJson(data.products, []);
+      if (Array.isArray(prods)) {
+        prods = prods.map(p => ({
+          ...p,
+          qty: Math.max(1, parseInt(p.qty) || 1),
+          unitWeight: Math.max(0, parseFloat(p.unitWeight) || 0),
+          lengthCm: Math.max(0, parseFloat(p.lengthCm) || 0),
+          widthCm: Math.max(0, parseFloat(p.widthCm) || 0),
+          heightCm: Math.max(0, parseFloat(p.heightCm) || 0)
+        }));
+        data.products = prods;
+      }
+    }
+
     // InDrive bargaining defaults
     if (!data.fareStatus) {
       data.fareStatus = 'Offered';
@@ -580,6 +603,12 @@ app.post('/api/cargo', authMiddleware, async (req, res) => {
 
 app.patch('/api/cargo/:id', authMiddleware, async (req, res) => {
   try {
+    if (req.body.weight !== undefined) req.body.weight = Math.max(0, parseFloat(req.body.weight) || 0);
+    if (req.body.chargeableWeight !== undefined) req.body.chargeableWeight = Math.max(0, parseFloat(req.body.chargeableWeight) || 0);
+    if (req.body.baseFare !== undefined) req.body.baseFare = Math.max(0, parseFloat(req.body.baseFare) || 0);
+    if (req.body.totalFare !== undefined) req.body.totalFare = Math.max(0, parseFloat(req.body.totalFare) || 0);
+    if (req.body.counterFare !== undefined) req.body.counterFare = Math.max(0, parseFloat(req.body.counterFare) || 0);
+
     if (req.body.assignedTruck) {
       const existingCargo = await Cargo.findByPk(req.params.id);
       const truck = await Truck.findOne({ where: { plateNumber: req.body.assignedTruck } });

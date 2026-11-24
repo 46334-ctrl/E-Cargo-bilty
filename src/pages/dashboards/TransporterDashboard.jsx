@@ -664,10 +664,13 @@ export default function TransporterDashboard() {
                         </span>
                         <input
                           type="number"
-                          min="1000"
+                          min="0"
                           step="500"
+                          onKeyDown={(e) => {
+                            if (e.key === '-' || e.key === 'e' || e.key === 'E' || e.key === '+') e.preventDefault();
+                          }}
                           value={transporterCounterFare}
-                          onChange={(e) => setTransporterCounterFare(e.target.value)}
+                          onChange={(e) => setTransporterCounterFare(e.target.value.replace(/-/g, '').replace(/[eE]/g, ''))}
                           placeholder="e.g. 85000"
                           className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono font-bold text-sm outline-none focus:border-orange-500"
                         />
@@ -1685,9 +1688,15 @@ export default function TransporterDashboard() {
                   </label>
                   <input 
                     type="number"
+                    min="0"
+                    step="100"
+                    onKeyDown={(e) => {
+                      if (e.key === '-' || e.key === 'e' || e.key === 'E' || e.key === '+') e.preventDefault();
+                    }}
                     value={assignPrice}
                     onChange={e => {
-                      setAssignPrice(e.target.value);
+                      const cleanVal = e.target.value.replace(/-/g, '').replace(/[eE]/g, '');
+                      setAssignPrice(cleanVal);
                       if (assignFormErrors.price) {
                         setAssignFormErrors(prev => {
                           const copy = { ...prev };

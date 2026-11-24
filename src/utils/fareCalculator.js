@@ -145,10 +145,10 @@ export const getIntercityDistance = (origin, destination) => {
  * Converted to Metric Tons for Bilty calculations (/ 1000).
  */
 export const calculateVolumetricWeight = (lengthCm = 0, widthCm = 0, heightCm = 0, qty = 1) => {
-  const l = parseFloat(lengthCm) || 0;
-  const w = parseFloat(widthCm) || 0;
-  const h = parseFloat(heightCm) || 0;
-  const q = parseInt(qty) || 1;
+  const l = Math.max(0, parseFloat(lengthCm) || 0);
+  const w = Math.max(0, parseFloat(widthCm) || 0);
+  const h = Math.max(0, parseFloat(heightCm) || 0);
+  const q = Math.max(1, parseInt(qty) || 1);
 
   if (l <= 0 || w <= 0 || h <= 0) return { kg: 0, tons: 0 };
 
