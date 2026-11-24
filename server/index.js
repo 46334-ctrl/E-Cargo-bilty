@@ -12,6 +12,7 @@ const User = require('./models/User');
 const { Truck, Cargo, Booking, BookingMessage, Notification, Complaint, LostCargoReport, LostCargoLog } = require('./models/Logistics');
 const { uploadToCloudinary } = require('./services/cloudinary');
 const { autoSeedDatabase } = require('./autoSeed');
+const { parseWeightToKg, formatWeightDisplay, computeCapacityMetrics } = require('./utils/capacity');
 const {
   initWhatsApp,
   sendWhatsAppMessage,
@@ -275,6 +276,110 @@ const sendNotification = async (userId, message) => {
   }
 };
 
+// ─── Truck Capacity Tracking Helpers ──────────────────────────────────────────
+
+/**
+ * Calculates current active used capacity in kg for a truck based on all ongoing bookings and active cargo
+ */
+async function getTruckActiveUsedCapacity(truckId, plateNumber) {
+  const activeBookings = await Booking.findAll({
+    where: {
+      [Op.or]: [
+        { truckId: truckId },
+        plateNumber ? { truckPlate: plateNumber } : null
+      ].filter(Boolean),
+      status: { [Op.notIn]: ['Completed', 'Cancelled', 'Rejected'] }
+    },
+    include: [{ model: Cargo, as: 'cargo' }]
+  });
+
+  const seenCargoIds = new Set();
+  let usedKg = 0;
+
+  for (const b of activeBookings) {
+    if (b.cargo) {
+      seenCargoIds.add(b.cargo.id);
+      usedKg += parseWeightToKg(b.cargo.chargeableWeight || b.cargo.weight);
+    }
+  }
+
+  if (plateNumber) {
+    const activeCargos = await Cargo.findAll({
+      where: {
+        assignedTruck: plateNumber,
+        status: { [Op.in]: ['Truck Assigned', 'Loaded', 'In Transit'] }
+      }
+    });
+
+    for (const c of activeCargos) {
+      if (!seenCargoIds.has(c.id)) {
+        seenCargoIds.add(c.id);
+        usedKg += parseWeightToKg(c.chargeableWeight || c.weight);
+      }
+    }
+  }
+
+  return usedKg;
+}
+
+/**
+ * Enriches an array of trucks with real-time capacity metrics (total, used, remaining, fill percentage)
+ */
+async function enrichTrucksWithCapacity(trucks) {
+  const [activeBookings, activeCargos] = await Promise.all([
+    Booking.findAll({
+      where: {
+        status: { [Op.notIn]: ['Completed', 'Cancelled', 'Rejected'] }
+      },
+      include: [{ model: Cargo, as: 'cargo' }]
+    }),
+    Cargo.findAll({
+      where: {
+        status: { [Op.in]: ['Truck Assigned', 'Loaded', 'In Transit'] },
+        assignedTruck: { [Op.ne]: null }
+      }
+    })
+  ]);
+
+  const usedKgByTruckId = {};
+  const usedKgByPlate = {};
+  const seenCargoIds = new Set();
+
+  for (const b of activeBookings) {
+    if (b.cargo) {
+      seenCargoIds.add(b.cargo.id);
+      const wt = parseWeightToKg(b.cargo.chargeableWeight || b.cargo.weight);
+      usedKgByTruckId[b.truckId] = (usedKgByTruckId[b.truckId] || 0) + wt;
+      if (b.truckPlate) {
+        usedKgByPlate[b.truckPlate] = (usedKgByPlate[b.truckPlate] || 0) + wt;
+      }
+    }
+  }
+
+  for (const c of activeCargos) {
+    if (!seenCargoIds.has(c.id) && c.assignedTruck) {
+      seenCargoIds.add(c.id);
+      const wt = parseWeightToKg(c.chargeableWeight || c.weight);
+      usedKgByPlate[c.assignedTruck] = (usedKgByPlate[c.assignedTruck] || 0) + wt;
+    }
+  }
+
+  return trucks.map(t => {
+    const plain = typeof t.toJSON === 'function' ? t.toJSON() : { ...t };
+    const usedKg = usedKgByTruckId[t.id] || usedKgByPlate[t.plateNumber] || 0;
+    const metrics = computeCapacityMetrics(plain, usedKg);
+
+    return {
+      ...plain,
+      id: t.id,
+      _id: t.id,
+      coordinates: [t.lat, t.lng],
+      ownerName: plain.owner ? (plain.owner.businessName || plain.owner.name) : 'Unknown',
+      ...metrics
+    };
+  });
+}
+
 // ─── Truck Routes ──────────────────────────────────────────────────────────────
 
 app.get('/api/trucks', authMiddleware, async (req, res) => {
@@ -288,17 +393,8 @@ app.get('/api/trucks', authMiddleware, async (req, res) => {
       include: [{ model: User, as: 'owner', attributes: ['name', 'phone', 'businessName'] }]
     });
 
-    const result = trucks.map(t => {
-      const plain = t.toJSON();
-      return {
-        ...plain,
-        id: t.id,
-        _id: t.id,
-        coordinates: [t.lat, t.lng],
-        ownerName: plain.owner ? (plain.owner.businessName || plain.owner.name) : 'Unknown'
-      };
-    });
-    res.json(result);
+    const enrichedResult = await enrichTrucksWithCapacity(trucks);
+    res.json(enrichedResult);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -306,11 +402,22 @@ app.get('/api/trucks', authMiddleware, async (req, res) => {
 
 app.post('/api/trucks', authMiddleware, async (req, res) => {
   try {
-    const { id: plateNumber, capacity, loc, status, coordinates, truckType, driverName, driverMobile, fitnessDoc, insuranceDoc } = req.body;
+    const { id: plateNumber, capacity, loc, status, coordinates, truckType, driverName, driverMobile, fitnessDoc, insuranceDoc, totalCapacity, total_capacity } = req.body;
     const [lat, lng] = coordinates || [31.5204, 74.3587];
+
+    const numericTotalCapacity = totalCapacity || total_capacity 
+      ? parseWeightToKg(totalCapacity || total_capacity, false)
+      : parseWeightToKg(capacity, true);
+
+    const safeCapacityString = capacity && String(capacity).trim() !== ''
+      ? String(capacity).trim()
+      : `${(numericTotalCapacity / 1000).toFixed(1)} Tons`;
+
     const truck = await Truck.create({
       plateNumber,
-      capacity,
+      capacity: safeCapacityString,
+      totalCapacity: numericTotalCapacity,
+      usedCapacity: 0,
       loc,
       ownerId: req.user.id,
       status: status || 'Available',
@@ -322,7 +429,9 @@ app.post('/api/trucks', authMiddleware, async (req, res) => {
       fitnessDoc,
       insuranceDoc
     });
-    res.status(201).json({ ...truck.toJSON(), _id: truck.id, coordinates: [truck.lat, truck.lng] });
+
+    const metrics = computeCapacityMetrics(truck.toJSON(), 0);
+    res.status(201).json({ ...truck.toJSON(), _id: truck.id, coordinates: [truck.lat, truck.lng], ...metrics });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -348,12 +457,25 @@ app.patch('/api/trucks/:id', authMiddleware, async (req, res) => {
     ) {
       updateData.plateNumber = req.body.id;
     }
+
+    if (req.body.totalCapacity || req.body.total_capacity) {
+      updateData.totalCapacity = parseWeightToKg(req.body.totalCapacity || req.body.total_capacity, false);
+    } else if (req.body.capacity) {
+      updateData.totalCapacity = parseWeightToKg(req.body.capacity, true);
+    }
+
     await Truck.update(updateData, { where: { id: req.params.id } });
-    const truck = await Truck.findByPk(req.params.id);
+    const truck = await Truck.findByPk(req.params.id, {
+      include: [{ model: User, as: 'owner', attributes: ['name', 'phone', 'businessName'] }]
+    });
     if (!truck) {
       return res.status(404).json({ message: 'Truck not found' });
     }
-    res.json({ ...truck.toJSON(), _id: truck.id, coordinates: [truck.lat, truck.lng] });
+
+    const usedKg = await getTruckActiveUsedCapacity(truck.id, truck.plateNumber);
+    const metrics = computeCapacityMetrics(truck.toJSON(), usedKg);
+
+    res.json({ ...truck.toJSON(), _id: truck.id, coordinates: [truck.lat, truck.lng], ...metrics });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -458,6 +580,24 @@ app.post('/api/cargo', authMiddleware, async (req, res) => {
 
 app.patch('/api/cargo/:id', authMiddleware, async (req, res) => {
   try {
+    if (req.body.assignedTruck) {
+      const existingCargo = await Cargo.findByPk(req.params.id);
+      const truck = await Truck.findOne({ where: { plateNumber: req.body.assignedTruck } });
+      if (truck && existingCargo) {
+        const cargoWeightKg = parseWeightToKg(req.body.chargeableWeight || req.body.weight || existingCargo.chargeableWeight || existingCargo.weight);
+        const currentUsedKg = await getTruckActiveUsedCapacity(truck.id, truck.plateNumber);
+        const capacityMetrics = computeCapacityMetrics(truck, currentUsedKg);
+        if (cargoWeightKg > 0 && cargoWeightKg > capacityMetrics.remaining_capacity) {
+          return res.status(400).json({
+            message: `Insufficient truck capacity. Remaining: ${capacityMetrics.remaining_capacity_display}, required: ${cargoWeightKg.toLocaleString()} kg (${(cargoWeightKg / 1000).toFixed(1)} Tons).`,
+            remainingCapacity: capacityMetrics.remaining_capacity,
+            requiredWeight: cargoWeightKg,
+            fillPercentage: capacityMetrics.fill_percentage
+          });
+        }
+      }
+    }
+
     await Cargo.update(req.body, { where: { id: req.params.id } });
     const cargo = await Cargo.findByPk(req.params.id);
 
@@ -596,8 +736,41 @@ app.get('/api/bookings', authMiddleware, async (req, res) => {
 
 app.post('/api/bookings', authMiddleware, async (req, res) => {
   try {
+    const { truckId, cargoId } = req.body;
+    
+    // Validate Truck exists
+    const truck = await Truck.findByPk(truckId);
+    if (!truck) {
+      return res.status(404).json({ message: 'Selected truck not found' });
+    }
+
+    // Overbooking Validation: check if incoming cargo weight exceeds truck's remaining capacity
+    let cargoWeightKg = 0;
+    let cargoTitle = req.body.cargoTitle || '';
+    if (cargoId) {
+      const cargo = await Cargo.findByPk(cargoId);
+      if (cargo) {
+        cargoWeightKg = parseWeightToKg(cargo.chargeableWeight || cargo.weight);
+        if (!cargoTitle) cargoTitle = cargo.title;
+      }
+    } else if (req.body.weight) {
+      cargoWeightKg = parseWeightToKg(req.body.weight);
+    }
+
+    const currentUsedKg = await getTruckActiveUsedCapacity(truck.id, truck.plateNumber);
+    const capacityMetrics = computeCapacityMetrics(truck, currentUsedKg);
+
+    if (cargoWeightKg > 0 && cargoWeightKg > capacityMetrics.remaining_capacity) {
+      return res.status(400).json({
+        message: `Insufficient truck capacity. Remaining: ${capacityMetrics.remaining_capacity_display}, required: ${cargoWeightKg.toLocaleString()} kg (${(cargoWeightKg / 1000).toFixed(1)} Tons).`,
+        remainingCapacity: capacityMetrics.remaining_capacity,
+        requiredWeight: cargoWeightKg,
+        fillPercentage: capacityMetrics.fill_percentage
+      });
+    }
+
     const deliveryCode = req.body.deliveryCode || Math.floor(1000 + Math.random() * 9000).toString();
-    const booking = await Booking.create({ ...req.body, deliveryCode, transporterId: req.user.id });
+    const booking = await Booking.create({ ...req.body, cargoTitle, deliveryCode, transporterId: req.user.id });
     await sendNotification(booking.truckOwnerId, `New booking request for ${booking.cargoTitle}`);
     io.emit('booking_updated');
 
@@ -1510,7 +1683,9 @@ const ensureSqliteColumns = async () => {
     `ALTER TABLE bookings ADD COLUMN discrepancy_notes TEXT;`,
     `ALTER TABLE bookings ADD COLUMN counter_price TEXT;`,
     `ALTER TABLE bookings ADD COLUMN counter_note TEXT;`,
-    `ALTER TABLE users ADD COLUMN city TEXT DEFAULT 'Lahore';`
+    `ALTER TABLE users ADD COLUMN city TEXT DEFAULT 'Lahore';`,
+    `ALTER TABLE trucks ADD COLUMN total_capacity REAL DEFAULT 0;`,
+    `ALTER TABLE trucks ADD COLUMN used_capacity REAL DEFAULT 0;`
   ];
   for (const q of queries) {
     try {
@@ -1531,7 +1706,23 @@ sequelize.sync(isSqlite ? {} : { alter: true })
   .then(async () => {
     await ensureSqliteColumns();
     await autoSeedDatabase(sequelize);
-    console.log(`✅ ${isSqlite ? 'SQLite' : 'MySQL'} Database synced`);
+
+    // Auto-backfill totalCapacity from capacity string for existing trucks
+    try {
+      const trucksToBackfill = await Truck.findAll();
+      for (const t of trucksToBackfill) {
+        if (!t.totalCapacity || Number(t.totalCapacity) <= 0) {
+          const parsed = parseWeightToKg(t.capacity, true);
+          if (parsed > 0) {
+            await t.update({ totalCapacity: parsed });
+          }
+        }
+      }
+    } catch (backfillErr) {
+      console.warn('Truck totalCapacity backfill notice:', backfillErr.message);
+    }
+
+    console.log(`✅ ${isSqlite ? 'SQLite' : 'MySQL'} Database synced with Real-Time Truck Capacity Tracking`);
     server.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Server running on port ${PORT} (0.0.0.0)`);
     });

@@ -244,6 +244,32 @@ export const stripWeightUnit = (val) => {
   return String(val).replace(/\s*(metric\s*)?tons?$/i, '').trim();
 };
 
+export const parseWeightToKg = (raw, defaultIsTon = false) => {
+  if (raw === null || raw === undefined) return 0;
+  if (typeof raw === 'number') {
+    if (isNaN(raw)) return 0;
+    if (defaultIsTon && raw <= 100) return Math.round(raw * 1000);
+    return Math.round(raw);
+  }
+
+  const str = String(raw).trim().toLowerCase();
+  if (!str) return 0;
+
+  const match = str.match(/([\d,]+(?:\.\d+)?)/);
+  if (!match) return 0;
+  const num = parseFloat(match[1].replace(/,/g, ''));
+  if (isNaN(num)) return 0;
+
+  if (str.includes('ton')) return Math.round(num * 1000);
+  if (str.includes('maund') || str.includes('mann') || str.includes('من')) return Math.round(num * 40);
+  if (str.includes('kg') || str.includes('kilo')) return Math.round(num);
+  if (str.includes('quintal') || str.includes('qtl')) return Math.round(num * 100);
+  if (str.includes('g') || str.includes('gram')) return Math.round(num / 1000);
+
+  if (defaultIsTon && num <= 100) return Math.round(num * 1000);
+  return Math.round(num);
+};
+
 export const formatWeightTons = (val, unitLabel = 'tons', fallback = '—') => {
   const cleaned = stripWeightUnit(val);
   if (!cleaned) return fallback;

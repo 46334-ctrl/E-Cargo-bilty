@@ -5,7 +5,7 @@ import {
   Truck, List, UploadCloud, AlertCircle,
   CheckCircle, Plus, X, Trash2, Edit, Send, MessageSquare,
   Calendar, Clock, Check, Camera, FileCheck, PenTool, RotateCcw, AlertTriangle, ShieldCheck, Radio, FileText, Loader2,
-  Handshake, TrendingUp, Coins
+  Handshake, TrendingUp, Coins, Package
 } from 'lucide-react';
 import GpsMapPin from '../../components/GpsMapPin';
 import BiltyModal from '../../components/BiltyModal';
@@ -295,10 +295,13 @@ export default function TruckOwnerDashboard() {
 
     setAddingTruck(true);
     try {
+      const numericCap = parseFloat(newTruck.capacity) || 0;
+      const totalKg = newTruck.capacityUnit === 'kg' ? Math.round(numericCap) : Math.round(numericCap * 1000);
       const fullCapacity = `${newTruck.capacity} ${newTruck.capacityUnit || 'ton'}`;
       await logisticsAPI.addTruck({
         id: (newTruck.id || '').toUpperCase().trim(),
         capacity: fullCapacity,
+        totalCapacity: totalKg,
         loc: newTruck.loc,
         truckType: newTruck.truckType,
         driverName: newTruck.driverName,
@@ -347,9 +350,14 @@ export default function TruckOwnerDashboard() {
     setAddingTruck(true);
     try {
       const targetId = editTruckData._id || editTruckData.id;
+      let numericTotalCap = undefined;
+      if (editTruckData.totalCapacity || editTruckData.total_capacity) {
+        numericTotalCap = Number(editTruckData.totalCapacity || editTruckData.total_capacity);
+      }
       await logisticsAPI.updateTruck(targetId, {
         plateNumber: plateVal,
         capacity: editTruckData.capacity,
+        totalCapacity: numericTotalCap,
         loc: editTruckData.loc,
         truckType: editTruckData.truckType,
         driverName: editTruckData.driverName,
@@ -836,6 +844,50 @@ export default function TruckOwnerDashboard() {
                               Insurance &middot; {truck.insuranceDoc ? 'Verified' : 'Pending'}
                             </span>
                           </div>
+
+                          {/* Real-Time Capacity Tracking Bar & Metric Breakdown */}
+                          <div className="mt-4 pt-3 border-t border-slate-100 bg-slate-50/70 p-3 rounded-xl border border-slate-200/80">
+                            <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5 text-xs">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-slate-800 flex items-center gap-1.5">
+                                  <Package size={13} className="text-orange-600" />
+                                  <span>Capacity:</span>
+                                </span>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase font-mono tracking-wider border shadow-2xs ${
+                                  (truck.fill_percentage >= 100 || (truck.remaining_capacity !== undefined && truck.remaining_capacity <= 0))
+                                    ? 'bg-rose-50 text-rose-800 border-rose-300'
+                                    : truck.fill_percentage >= 75
+                                      ? 'bg-amber-50 text-amber-900 border-amber-300'
+                                      : 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                                }`}>
+                                  {(truck.fill_percentage >= 100 || (truck.remaining_capacity !== undefined && truck.remaining_capacity <= 0))
+                                    ? 'Full (100%)'
+                                    : truck.fill_percentage >= 75
+                                      ? `Filling Up (${truck.fill_percentage}%)`
+                                      : `Available (${truck.fill_percentage || 0}% full)`}
+                                </span>
+                              </div>
+                              <div className="text-[11px] font-mono text-slate-600">
+                                <strong className="text-slate-900 font-bold">{(truck.used_capacity || 0).toLocaleString()} kg</strong> used /{' '}
+                                <strong className="text-emerald-700 font-bold">{(truck.remaining_capacity !== undefined ? truck.remaining_capacity : (truck.total_capacity || 0)).toLocaleString()} kg</strong> left{' '}
+                                <span className="text-slate-500 font-medium">(Total: {(truck.total_capacity || 0).toLocaleString()} kg)</span>
+                              </div>
+                            </div>
+
+                            {/* Solid high-contrast horizontal progress bar */}
+                            <div className="w-full bg-slate-200/90 rounded-full h-2.5 overflow-hidden flex shadow-inner">
+                              <div
+                                className={`h-full transition-all duration-500 rounded-full ${
+                                  (truck.fill_percentage >= 100 || (truck.remaining_capacity !== undefined && truck.remaining_capacity <= 0))
+                                    ? 'bg-rose-600'
+                                    : truck.fill_percentage >= 75
+                                      ? 'bg-amber-500'
+                                      : 'bg-emerald-600'
+                                }`}
+                                style={{ width: `${Math.min(100, Math.max(0, truck.fill_percentage || 0))}%` }}
+                              />
+                            </div>
+                          </div>
                         </div>
                       </div>
 
@@ -863,11 +915,20 @@ export default function TruckOwnerDashboard() {
                         >
                           <Trash2 size={14} />
                         </button>
-                        <span className={`px-3 py-1 rounded-xl text-xs font-bold tracking-wider border uppercase ml-2 ${truck.status === 'Available' ? 'bg-emerald-50 text-emerald-800 border-emerald-300' :
-                          truck.status === 'In Transit' ? 'bg-orange-50 text-orange-800 border-orange-300' :
-                            'bg-amber-50 text-amber-800 border-amber-200'
-                          }`}>
-                          {truck.status}
+                        <span className={`px-3 py-1 rounded-xl text-xs font-bold tracking-wider border uppercase ml-2 ${
+                          (truck.fill_percentage >= 100 || (truck.remaining_capacity !== undefined && truck.remaining_capacity <= 0))
+                            ? 'bg-rose-50 text-rose-800 border-rose-300'
+                            : truck.fill_percentage >= 75
+                              ? 'bg-amber-50 text-amber-900 border-amber-300'
+                              : truck.status === 'Available'
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                                : 'bg-orange-50 text-orange-800 border-orange-300'
+                        }`}>
+                          {(truck.fill_percentage >= 100 || (truck.remaining_capacity !== undefined && truck.remaining_capacity <= 0))
+                            ? 'Full'
+                            : truck.fill_percentage >= 75
+                              ? 'Filling Up'
+                              : truck.status}
                         </span>
                       </div>
                     </div>
@@ -1621,13 +1682,17 @@ export default function TruckOwnerDashboard() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Capacity</label>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Total Capacity
+                  </label>
                   <input
                     type="text"
                     value={editTruckData.capacity}
                     onChange={e => setEditTruckData({ ...editTruckData, capacity: e.target.value })}
+                    placeholder="e.g. 25 Tons or 25000 kg"
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-900 text-xs outline-none focus:bg-white focus:border-orange-500 font-mono"
                   />
+                  <p className="text-[10px] text-slate-500 mt-1 font-mono">Accepts e.g. 25 Tons, 25000 kg</p>
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">Truck Type</label>

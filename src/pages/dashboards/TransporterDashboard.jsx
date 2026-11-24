@@ -13,7 +13,7 @@ import { logisticsAPI, authAPI, adminAPI, socket } from '../../api';
 import BiltyModal from '../../components/BiltyModal';
 import { ChamakRibbon, WorkshopBadge, TruckPoetryBanner, TruckLotusArchBadge, TruckMorBadge } from '../../components/TruckArt';
 import MapViewer from '../../components/MapViewer';
-import { calculateFreightTariff, VEHICLE_MULTIPLIERS, getIntercityDistance, formatFreightPrice, formatWeightTons, BARGAIN_QUICK_INCREMENTS } from '../../utils/fareCalculator';
+import { calculateFreightTariff, VEHICLE_MULTIPLIERS, getIntercityDistance, formatFreightPrice, formatWeightTons, BARGAIN_QUICK_INCREMENTS, parseWeightToKg } from '../../utils/fareCalculator';
 import { sortByProximity, getProximityBadge, getProximityDistance } from '../../utils/proximity';
 import LostCargoPortal from '../../components/lostCargo/LostCargoPortal';
 import SearchSelect from '../../components/SearchSelect';
@@ -324,6 +324,18 @@ export default function TransporterDashboard() {
     }
     const priceErr = validatePositiveNumber(assignPrice, 'Agreed Price', isUrdu);
     if (priceErr) errors.price = priceErr;
+
+    // Validate truck remaining capacity before creating booking
+    if (selectedTruckForAssign && selectedCargoForAssign) {
+      const truckTot = selectedTruckForAssign.total_capacity || parseWeightToKg(selectedTruckForAssign.capacity, true) || 0;
+      const truckUsed = selectedTruckForAssign.used_capacity || 0;
+      const truckRem = selectedTruckForAssign.remaining_capacity !== undefined ? selectedTruckForAssign.remaining_capacity : Math.max(0, truckTot - truckUsed);
+      const cargoWeight = parseWeightToKg(selectedCargoForAssign.chargeableWeight || selectedCargoForAssign.weight || assignWeight, assignWeightUnit === 'ton');
+      if (cargoWeight > 0 && cargoWeight > truckRem) {
+        toast.error(isUrdu ? `ٹرک میں گنجائش کم ہے! مال: ${cargoWeight.toLocaleString()} کلو، باقی گنجائش: ${truckRem.toLocaleString()} کلو` : `Cannot assign! Cargo (${cargoWeight.toLocaleString()} kg) exceeds remaining truck space (${truckRem.toLocaleString()} kg).`);
+        return;
+      }
+    }
 
     if (Object.keys(errors).length > 0) {
       setAssignFormErrors(errors);
@@ -894,10 +906,31 @@ export default function TransporterDashboard() {
                         </p>
                       </div>
                       <div className="text-right shrink-0">
-                        <span className="text-[9px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-300 font-mono">
-                          {truck.capacity}
-                        </span>
-                        <p className="text-[9px] text-slate-400 mt-0.5 capitalize">{truck.truckType || 'Heavy'}</p>
+                        {(() => {
+                          const tot = truck.total_capacity || parseWeightToKg(truck.capacity, true) || 0;
+                          const rem = truck.remaining_capacity !== undefined ? truck.remaining_capacity : tot;
+                          const pct = truck.fill_percentage !== undefined ? truck.fill_percentage : (tot > 0 ? Math.round(((tot - rem) / tot) * 100) : 0);
+                          const isFull = rem <= 0 || pct >= 100;
+                          const isFilling = pct >= 75 && !isFull;
+                          return (
+                            <div>
+                              <span className={`text-[9px] font-bold px-2 py-0.5 rounded border font-mono ${
+                                isFull ? 'bg-red-50 text-red-700 border-red-300' :
+                                isFilling ? 'bg-amber-50 text-amber-800 border-amber-300' :
+                                'bg-emerald-50 text-emerald-800 border-emerald-300'
+                              }`}>
+                                {isFull ? 'FULL' : `${rem.toLocaleString()} kg left`}
+                              </span>
+                              <div className="w-16 bg-slate-200 h-1 rounded-full overflow-hidden mt-1 ml-auto">
+                                <div
+                                  className={`h-full ${isFull ? 'bg-red-500' : isFilling ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                                  style={{ width: `${Math.min(100, pct)}%` }}
+                                />
+                              </div>
+                              <p className="text-[9px] text-slate-400 mt-0.5 capitalize">{truck.truckType || 'Heavy'}</p>
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
                   ))}
@@ -942,14 +975,76 @@ export default function TransporterDashboard() {
                             <span>Depot: <strong className="text-slate-900">{truck.loc}</strong> &middot; {truck._proximityBadge?.shortText}</span>
                           </p>
                         </div>
+
+                        {/* Real-Time Live Capacity Tracking Bar & Metrics */}
+                        {(() => {
+                          const tot = truck.total_capacity || parseWeightToKg(truck.capacity, true) || 0;
+                          const used = truck.used_capacity || 0;
+                          const rem = truck.remaining_capacity !== undefined ? truck.remaining_capacity : Math.max(0, tot - used);
+                          const pct = truck.fill_percentage !== undefined ? truck.fill_percentage : (tot > 0 ? Math.min(100, Math.round((used / tot) * 100)) : 0);
+                          const isFull = rem <= 0 || pct >= 100;
+                          const isFilling = pct >= 75 && !isFull;
+                          return (
+                            <div className="mt-4 bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
+                              <div className="flex justify-between items-center text-xs">
+                                <span className="font-bold text-slate-700 flex items-center gap-1">
+                                  <Package size={13} className="text-slate-500" />
+                                  <span>{isUrdu ? 'گنجائش' : 'Available Capacity'}</span>
+                                </span>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded font-mono border ${
+                                  isFull ? 'bg-red-50 text-red-700 border-red-300' :
+                                  isFilling ? 'bg-amber-50 text-amber-800 border-amber-300' :
+                                  'bg-emerald-50 text-emerald-800 border-emerald-300'
+                                }`}>
+                                  {isFull ? (isUrdu ? 'مکمل بھرا ہوا' : 'Full (100%)') :
+                                   isFilling ? (isUrdu ? `${pct}% بھرا ہوا` : `Filling Up (${pct}%)`) :
+                                   (isUrdu ? `${rem.toLocaleString()} کلو باقی` : `${rem.toLocaleString()} kg free`)}
+                                </span>
+                              </div>
+
+                              {/* Progress bar */}
+                              <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full transition-all duration-300 ${
+                                    isFull ? 'bg-red-500' : isFilling ? 'bg-amber-500' : 'bg-emerald-500'
+                                  }`}
+                                  style={{ width: `${Math.min(100, pct)}%` }}
+                                />
+                              </div>
+
+                              {/* Numeric breakdown */}
+                              <div className="flex justify-between items-center text-[10px] text-slate-500 font-mono">
+                                <span>Used: <strong className="text-slate-800">{used.toLocaleString()} kg</strong></span>
+                                <span className={isFull ? 'text-red-600 font-bold' : 'text-emerald-700 font-bold'}>
+                                  {rem.toLocaleString()} kg left
+                                </span>
+                                <span>Total: <strong className="text-slate-800">{tot.toLocaleString()} kg</strong></span>
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
 
-                      <button 
-                        onClick={() => openAssignModalForTruck(truck)}
-                        className="w-full btn-primary font-bold py-2.5 rounded-xl text-xs transition-all cursor-pointer mt-4 shadow-xs"
-                      >
-                        {isUrdu ? 'گاڑی مقرر کریں' : 'Assign to Shipment'}
-                      </button>
+                      {(() => {
+                        const tot = truck.total_capacity || parseWeightToKg(truck.capacity, true) || 0;
+                        const rem = truck.remaining_capacity !== undefined ? truck.remaining_capacity : Math.max(0, tot - (truck.used_capacity || 0));
+                        const isFull = rem <= 0 || (truck.fill_percentage !== undefined && truck.fill_percentage >= 100);
+                        return (
+                          <button 
+                            onClick={() => openAssignModalForTruck(truck)}
+                            disabled={isFull}
+                            className={`w-full font-bold py-2.5 rounded-xl text-xs transition-all mt-4 shadow-xs ${
+                              isFull
+                                ? 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300'
+                                : 'btn-primary cursor-pointer'
+                            }`}
+                          >
+                            {isFull
+                              ? (isUrdu ? 'ٹرک مکمل بھرا ہوا ہے' : 'Truck Full (No Space)')
+                              : (isUrdu ? 'گاڑی مقرر کریں' : 'Assign to Shipment')}
+                          </button>
+                        );
+                      })()}
                     </div>
                   );
                 })}
@@ -1309,6 +1404,23 @@ export default function TransporterDashboard() {
           handlingFlags: selectedCargoForAssign?.specialHandling || []
         });
 
+        const truckTotalKg = selectedTruckForAssign.total_capacity || parseWeightToKg(selectedTruckForAssign.capacity, true) || 0;
+        const truckUsedKg = selectedTruckForAssign.used_capacity || 0;
+        const truckRemainingKg = selectedTruckForAssign.remaining_capacity !== undefined
+          ? selectedTruckForAssign.remaining_capacity
+          : Math.max(0, truckTotalKg - truckUsedKg);
+        const truckCurrentPct = truckTotalKg > 0 ? Math.min(100, Math.round((truckUsedKg / truckTotalKg) * 100)) : 0;
+
+        // Weight of cargo to be assigned
+        const cargoWeightRaw = selectedCargoForAssign
+          ? (selectedCargoForAssign.chargeableWeight || selectedCargoForAssign.weight || assignWeight)
+          : assignWeight;
+        const cargoWeightKg = parseWeightToKg(cargoWeightRaw, assignWeightUnit === 'ton');
+
+        const isOverCapacity = cargoWeightKg > 0 && cargoWeightKg > truckRemainingKg;
+        const spaceRemainingAfter = Math.max(0, truckRemainingKg - cargoWeightKg);
+        const newFillPct = truckTotalKg > 0 ? Math.min(100, Math.round(((truckUsedKg + cargoWeightKg) / truckTotalKg) * 100)) : 100;
+
         return (
           <div
             className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/80 backdrop-blur-xs px-2.5 sm:px-4 py-4"
@@ -1327,27 +1439,47 @@ export default function TransporterDashboard() {
                 Set your freight offer for vehicle <span className="text-orange-700 dark:text-orange-400 font-bold font-mono">{selectedTruckForAssign.plateNumber}</span>. Driver can accept or counter-offer.
               </p>
 
-              {/* Truck summary badge */}
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 mb-4 text-left flex items-center justify-between">
-                <div>
+              {/* Truck summary badge with real-time capacity progress */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 mb-4 text-left space-y-2">
+                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="font-mono font-bold text-slate-900 text-sm">{selectedTruckForAssign.plateNumber}</span>
                     <span className="text-[10px] font-bold bg-orange-50 text-orange-800 px-2 py-0.5 rounded border border-orange-200 font-mono">
                       {selectedTruckForAssign.truckType}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-600 mt-1">
+                  <div className="text-right font-mono">
+                    <span className={`text-xs font-bold px-2.5 py-1 rounded-lg border ${
+                      truckRemainingKg <= 0 ? 'bg-red-50 text-red-700 border-red-300' :
+                      truckCurrentPct >= 75 ? 'bg-amber-50 text-amber-800 border-amber-300' :
+                      'bg-emerald-50 text-emerald-800 border-emerald-300'
+                    }`}>
+                      {truckRemainingKg <= 0 ? 'FULL' : `${truckRemainingKg.toLocaleString()} kg left`}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Progress bar */}
+                <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full transition-all duration-300 ${
+                      truckRemainingKg <= 0 ? 'bg-red-500' : truckCurrentPct >= 75 ? 'bg-amber-500' : 'bg-emerald-500'
+                    }`}
+                    style={{ width: `${Math.min(100, truckCurrentPct)}%` }}
+                  />
+                </div>
+
+                <div className="flex justify-between items-center text-[11px] text-slate-600">
+                  <p>
                     Depot: <span className="text-slate-900 font-medium">{selectedTruckForAssign.loc}</span> &bull; Driver: <span className="text-slate-900 font-medium">{selectedTruckForAssign.driverName}</span>
                     {assignOrigin && (
-                      <span className="ml-2 font-mono text-[11px] font-bold text-orange-700">
-                        ({getProximityDistance(assignOrigin, selectedTruckForAssign.loc) === 0 ? '📍 At Pickup Hub (0 km)' : `📍 ${getProximityDistance(assignOrigin, selectedTruckForAssign.loc)} km to ${assignOrigin}`})
+                      <span className="ml-1.5 font-mono text-[10px] font-bold text-orange-700">
+                        ({getProximityDistance(assignOrigin, selectedTruckForAssign.loc) === 0 ? '📍 0 km' : `📍 ${getProximityDistance(assignOrigin, selectedTruckForAssign.loc)} km`})
                       </span>
                     )}
                   </p>
-                </div>
-                <div className="text-right font-mono">
-                  <span className="text-xs font-bold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-300">
-                    Max: {selectedTruckForAssign.capacity}
+                  <span className="font-mono text-[10px] text-slate-500 shrink-0">
+                    Used: {truckUsedKg.toLocaleString()} kg / {truckTotalKg.toLocaleString()} kg
                   </span>
                 </div>
               </div>
@@ -1378,11 +1510,15 @@ export default function TransporterDashboard() {
                         ? '-- No accepted cargo available yet --'
                         : '-- Select Consignment Request --'}
                     </option>
-                    {acceptedCargoList.map(c => (
+                    {acceptedCargoList.map(c => {
+                      const cKg = parseWeightToKg(c.chargeableWeight || c.weight, true);
+                      const fits = cKg <= truckRemainingKg;
+                      return (
                         <option key={c._id} value={String(c._id)}>
-                          REQ-{c._id}: {c.title} ({c.weight} tons) &bull; {c.origin} &rarr; {c.destination}
+                          REQ-{c._id}: {c.title} ({cKg.toLocaleString()} kg) &bull; {c.origin} &rarr; {c.destination} {fits ? '✅ [Fits]' : '⚠️ [Exceeds Capacity]'}
                         </option>
-                      ))}
+                      );
+                    })}
                   </select>
                   {acceptedCargoList.length === 0 && (
                     <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 mt-1.5 font-medium">
@@ -1451,6 +1587,51 @@ export default function TransporterDashboard() {
                     </select>
                   </div>
                 </div>
+
+                {/* Real-time Capacity Space Preview / Overbooking Warning */}
+                {selectedCargoForAssign && (
+                  isOverCapacity ? (
+                    <div className="bg-red-50 border-2 border-red-400 rounded-xl p-3 text-red-950 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <AlertCircle size={16} className="text-red-600 shrink-0" />
+                        <span className="font-bold text-xs uppercase tracking-wider text-red-900">
+                          {isUrdu ? 'گنجائش سے زیادہ ہے (Insufficient Space)' : 'Overbooking Alert: Truck Capacity Exceeded'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-red-800">
+                        Consignment weight is <strong>{cargoWeightKg.toLocaleString()} kg</strong>, which exceeds this vehicle's remaining capacity of <strong>{truckRemainingKg.toLocaleString()} kg</strong>.
+                      </p>
+                      <p className="text-[11px] text-red-700 font-medium">
+                        {isUrdu ? 'برائے مہربانی کوئی دوسرا ٹرک منتخب کریں یا ہلکا مال مقرر کریں۔' : 'Dispatch is blocked to prevent overloading. Select a larger truck or a lighter consignment.'}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="bg-emerald-50 border border-emerald-300 rounded-xl p-3 text-emerald-950 space-y-2">
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="font-bold flex items-center gap-1.5 text-emerald-900">
+                          <CheckCircle size={15} className="text-emerald-700" />
+                          {isUrdu ? 'گنجائش درست ہے (Capacity Approved)' : 'Capacity Verification Passed'}
+                        </span>
+                        <span className="font-mono font-bold text-emerald-800 text-[11px]">
+                          {newFillPct}% Full After Loading
+                        </span>
+                      </div>
+                      <p className="text-xs text-emerald-800">
+                        Loading <strong>{cargoWeightKg.toLocaleString()} kg</strong> will leave <strong>{spaceRemainingAfter.toLocaleString()} kg</strong> available space remaining on this truck.
+                      </p>
+                      <div className="w-full bg-emerald-100 h-1.5 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full transition-all duration-300 ${newFillPct >= 100 ? 'bg-red-500' : newFillPct >= 75 ? 'bg-amber-500' : 'bg-emerald-600'}`}
+                          style={{ width: `${Math.min(100, newFillPct)}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-[10px] font-mono text-emerald-700 pt-0.5">
+                        <span>Used: {truckUsedKg.toLocaleString()} kg</span>
+                        <span>Post-load: {(truckUsedKg + cargoWeightKg).toLocaleString()} kg / {truckTotalKg.toLocaleString()} kg</span>
+                      </div>
+                    </div>
+                  )
+                )}
 
                 {/* Freight Offer & Quick Bargaining Presets */}
                 <div className="bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-950/40 dark:to-amber-950/30 border-2 border-orange-300 dark:border-orange-500/50 rounded-xl p-4 shadow-2xs space-y-3">
@@ -1531,11 +1712,17 @@ export default function TransporterDashboard() {
 
                 <button 
                   type="submit" 
-                  disabled={isSubmittingAction || acceptedCargoList.length === 0}
+                  disabled={isSubmittingAction || acceptedCargoList.length === 0 || isOverCapacity}
                   className="w-full btn-primary text-white font-bold py-3 rounded-xl text-sm transition-all cursor-pointer mt-4 shadow-xs disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {isSubmittingAction && <Loader2 size={15} className="animate-spin" />}
-                  <span>{isSubmittingAction ? 'Dispatching...' : (isUrdu ? 'گاڑی مقرر کریں' : 'Confirm Dispatch & Assignment')}</span>
+                  <span>
+                    {isOverCapacity
+                      ? (isUrdu ? 'گنجائش سے زیادہ ہے (Cannot Dispatch)' : 'Cannot Dispatch (Exceeds Truck Capacity)')
+                      : isSubmittingAction
+                      ? 'Dispatching...'
+                      : (isUrdu ? 'گاڑی مقرر کریں' : 'Confirm Dispatch & Assignment')}
+                  </span>
                 </button>
               </form>
             </div>

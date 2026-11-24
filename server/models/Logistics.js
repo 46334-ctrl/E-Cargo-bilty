@@ -11,6 +11,16 @@ const Truck = sequelize.define('Truck', {
     field: 'plate_number'
   },
   capacity: { type: DataTypes.STRING, allowNull: false },
+  totalCapacity: {
+    type: DataTypes.FLOAT,
+    defaultValue: 0,
+    field: 'total_capacity'
+  },
+  usedCapacity: {
+    type: DataTypes.FLOAT,
+    defaultValue: 0,
+    field: 'used_capacity'
+  },
   loc: { type: DataTypes.STRING, allowNull: false },
   ownerId: {
     type: DataTypes.INTEGER,
