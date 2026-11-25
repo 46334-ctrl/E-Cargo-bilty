@@ -509,6 +509,9 @@ const formatCargo = (c) => {
   return {
     ...plain,
     products: safeParseJson(plain.products, []),
+    receivingVerification: safeParseJson(plain.receivingVerification, null),
+    hasShortage: Boolean(plain.hasShortage),
+    shortageNote: plain.shortageNote || null,
     pickupDetails: safeParseJson(plain.pickupDetails, {}),
     recipients: safeParseJson(plain.recipients, []),
     dimensions: safeParseJson(plain.dimensions, {}),
@@ -674,7 +677,21 @@ app.patch('/api/cargo/:id', authMiddleware, async (req, res) => {
 
 app.patch('/api/cargo/:id/respond', authMiddleware, async (req, res) => {
   try {
-    const { status, rejectionReason, counterFare, counterNote, counterBy, totalFare, fareStatus } = req.body;
+    const {
+      status,
+      rejectionReason,
+      counterFare,
+      counterNote,
+      counterBy,
+      totalFare,
+      fareStatus,
+      receivingVerification,
+      hasShortage,
+      shortageNote,
+      products,
+      chargeableWeight,
+      weight
+    } = req.body;
     const updateData = {};
     if (status !== undefined) updateData.status = status;
     if (rejectionReason !== undefined) updateData.rejectionReason = rejectionReason;
@@ -683,12 +700,25 @@ app.patch('/api/cargo/:id/respond', authMiddleware, async (req, res) => {
     if (counterBy !== undefined) updateData.counterBy = counterBy;
     if (totalFare !== undefined) updateData.totalFare = totalFare;
     if (fareStatus !== undefined) updateData.fareStatus = fareStatus;
+    if (receivingVerification !== undefined) updateData.receivingVerification = receivingVerification;
+    if (hasShortage !== undefined) updateData.hasShortage = Boolean(hasShortage);
+    if (shortageNote !== undefined) updateData.shortageNote = shortageNote;
+    if (products !== undefined) updateData.products = products;
+    if (chargeableWeight !== undefined) updateData.chargeableWeight = chargeableWeight;
+    if (weight !== undefined) updateData.weight = weight;
 
     await Cargo.update(updateData, { where: { id: req.params.id } });
     const cargo = await Cargo.findByPk(req.params.id);
 
     if (cargo.businessOwnerId) {
-      if (fareStatus === 'Counter-Offered' && counterFare) {
+      if (hasShortage) {
+        const missingCount = receivingVerification?.totalShortageQty || 'some';
+        const receivedCount = receivingVerification?.totalReceivedQty || 'partial';
+        await sendNotification(
+          cargo.businessOwnerId,
+          `⚠️ Shortage Endorsement: Transporter received ${receivedCount} items for "${cargo.title}" (${missingCount} missing at dock). Note: "${shortageNote || 'Short delivery recorded by carrier'}"`
+        );
+      } else if (fareStatus === 'Counter-Offered' && counterFare) {
         const orig = cargo.totalFare ? Number(cargo.totalFare).toLocaleString() : '';
         await sendNotification(
           cargo.businessOwnerId,
@@ -698,7 +728,7 @@ app.patch('/api/cargo/:id/respond', authMiddleware, async (req, res) => {
         const agreed = (totalFare || cargo.totalFare) ? Number(totalFare || cargo.totalFare).toLocaleString() : '';
         await sendNotification(
           cargo.businessOwnerId,
-          `🤝 Transporter accepted your fare offer of Rs. ${agreed} for "${cargo.title}"! Shipment confirmed.`
+          `🤝 Transporter verified and accepted your shipment "${cargo.title}" (Rs. ${agreed})! Ready for vehicle dispatch.`
         );
       } else if (status === 'Rejected') {
         await sendNotification(
@@ -1705,6 +1735,9 @@ const ensureSqliteColumns = async () => {
     `ALTER TABLE cargo ADD COLUMN counter_note TEXT;`,
     `ALTER TABLE cargo ADD COLUMN counter_by TEXT;`,
     `ALTER TABLE cargo ADD COLUMN fare_status TEXT DEFAULT 'Offered';`,
+    `ALTER TABLE cargo ADD COLUMN receiving_verification TEXT;`,
+    `ALTER TABLE cargo ADD COLUMN has_shortage INTEGER DEFAULT 0;`,
+    `ALTER TABLE cargo ADD COLUMN shortage_note TEXT;`,
     `ALTER TABLE bookings ADD COLUMN delivery_code TEXT;`,
     `ALTER TABLE bookings ADD COLUMN receiver_signature TEXT;`,
     `ALTER TABLE bookings ADD COLUMN pod_photo_url TEXT;`,

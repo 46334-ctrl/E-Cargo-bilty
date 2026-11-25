@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { X, Printer, Download, FileText, Loader2, Eye, CheckCircle2, Truck } from 'lucide-react';
+import { X, Printer, Download, FileText, Loader2, Eye, CheckCircle2, Truck, AlertTriangle } from 'lucide-react';
 import GpsMapPin from './GpsMapPin';
 import { generateBiltyPDFBlob, generateBiltyPDF } from '../utils/generateBiltyPDF';
 import { formatFreightPrice, stripWeightUnit } from '../utils/fareCalculator';
@@ -40,7 +40,11 @@ export default function BiltyModal({ booking, onClose }) {
     senderNTN: b.cargo?.senderNTN || b.senderNTN,
     deliveryNotes: b.cargo?.deliveryNotes || b.deliveryNotes,
     chargeableWeight: b.cargo?.chargeableWeight || b.chargeableWeight,
-    receiverSignature: b.receiverSignature
+    receiverSignature: b.receiverSignature,
+    hasShortage: b.cargo?.hasShortage || b.hasShortage,
+    shortageNote: b.cargo?.shortageNote || b.shortageNote,
+    receivingVerification: b.cargo?.receivingVerification || b.receivingVerification,
+    cargo: b.cargo
   });
 
   useEffect(() => {
@@ -283,6 +287,26 @@ export default function BiltyModal({ booking, onClose }) {
                   {data.deliveryNotes && (
                     <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 text-xs text-slate-800">
                       <span className="font-bold text-orange-800">Delivery Notes: </span>{data.deliveryNotes}
+                    </div>
+                  )}
+
+                  {data.hasShortage && (
+                    <div className="bg-amber-50 border-2 border-amber-400 rounded-xl p-3.5 text-xs text-amber-950 space-y-1.5 shadow-2xs">
+                      <div className="flex items-center gap-1.5 text-amber-900 font-black uppercase tracking-wider text-[11px]">
+                        <AlertTriangle size={15} className="text-amber-600 shrink-0" />
+                        <span>Carrier Shortage Endorsement / نقص و کمی کی توثیق</span>
+                      </div>
+                      <p className="font-semibold text-slate-800">
+                        Loading Bay Count: <strong className="text-amber-900">{data.receivingVerification?.totalReceivedQty}</strong> items received (Declared: {data.receivingVerification?.totalDeclaredQty}, Missing: {data.receivingVerification?.totalShortageQty} units).
+                      </p>
+                      {data.shortageNote && (
+                        <p className="text-[11px] text-slate-600 italic bg-white/80 p-2 rounded-lg border border-amber-200">
+                          "{data.shortageNote}"
+                        </p>
+                      )}
+                      <p className="text-[10px] text-amber-700 font-mono">
+                        Carrier transit liability is strictly restricted to verified received count.
+                      </p>
                     </div>
                   )}
 

@@ -124,7 +124,10 @@ const Cargo = sequelize.define('Cargo', {
   counterFare: { type: DataTypes.FLOAT, allowNull: true, field: 'counter_fare' },
   counterNote: { type: DataTypes.STRING, allowNull: true, field: 'counter_note' },
   counterBy: { type: DataTypes.STRING, allowNull: true, field: 'counter_by' },
-  fareStatus: { type: DataTypes.STRING, defaultValue: 'Offered', field: 'fare_status' }
+  fareStatus: { type: DataTypes.STRING, defaultValue: 'Offered', field: 'fare_status' },
+  receivingVerification: { type: DataTypes.JSON, defaultValue: null, field: 'receiving_verification' },
+  hasShortage: { type: DataTypes.BOOLEAN, defaultValue: false, field: 'has_shortage' },
+  shortageNote: { type: DataTypes.TEXT, allowNull: true, field: 'shortage_note' }
 }, {
   tableName: 'cargo',
   timestamps: true,

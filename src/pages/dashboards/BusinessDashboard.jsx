@@ -1974,6 +1974,28 @@ export default function BusinessDashboard() {
                             <p className="font-semibold text-emerald-800 mt-0.5">{selectedCargo.paymentTerms || 'Prepaid'}</p>
                           </div>
 
+                          {/* Transporter Shortage Endorsement Banner if cargo had missing items */}
+                          {selectedCargo.hasShortage && (
+                            <div className="col-span-full bg-amber-50 dark:bg-amber-950/40 border-2 border-amber-400 dark:border-amber-600/70 p-4 rounded-xl space-y-2">
+                              <div className="flex items-center gap-2">
+                                <AlertTriangle className="text-amber-600 dark:text-amber-400 shrink-0" size={18} />
+                                <h4 className="font-extrabold text-amber-900 dark:text-amber-200 text-xs sm:text-sm">
+                                  {isUrdu ? '⚠️ ٹرانسپورٹر کا ڈاک پر شارٹیج کا باقاعدہ اندراج (Shortage Endorsement)' : '⚠️ Official Carrier Shortage Endorsement on Record'}
+                                </h4>
+                              </div>
+                              <p className="text-xs text-amber-950 dark:text-amber-100 font-medium">
+                                {isUrdu
+                                  ? `ٹرانسپورٹر نے ڈاک پر گنتی کے دوران ${selectedCargo.receivingVerification?.totalReceivedQty} اشیاء وصول کیں (${selectedCargo.receivingVerification?.totalShortageQty} اشیاء کم ہیں)۔ ای-بلٹی پر کمی درج ہوچکی ہے۔`
+                                  : `Transporter verified receipt of ${selectedCargo.receivingVerification?.totalReceivedQty} of ${selectedCargo.receivingVerification?.totalDeclaredQty} declared packages (${selectedCargo.receivingVerification?.totalShortageQty} units missing at loading bay). Carrier liability is limited to verified received count.`}
+                              </p>
+                              {selectedCargo.shortageNote && (
+                                <p className="text-xs italic bg-white/80 dark:bg-slate-900/60 p-2.5 rounded-lg border border-amber-300 dark:border-amber-800 text-slate-800 dark:text-slate-200">
+                                  "{selectedCargo.shortageNote}"
+                                </p>
+                              )}
+                            </div>
+                          )}
+
                           {/* Fare Bargaining & Counter-Offer Status Card */}
                           <div className="col-span-full">
                             {selectedCargo.counterFare && selectedCargo.counterBy === 'transporter' ? (

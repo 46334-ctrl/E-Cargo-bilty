@@ -6,8 +6,10 @@ import {
   Users, FileText, Activity, AlertTriangle, Check, X, XCircle, Shield, 
   Package, Trash2, CheckCircle, Loader2, ArrowRight, Truck, 
   Mail, Phone, Clock, Eye, AlertCircle, FileCheck, Send, MessageSquare, 
-  Calendar, LayoutGrid, Radio, Handshake, TrendingUp, Coins, Repeat
+  Calendar, LayoutGrid, Radio, Handshake, TrendingUp, Coins, Repeat,
+  ClipboardCheck, PackageCheck, ShieldAlert
 } from 'lucide-react';
+import ItemizedReceivingModal from '../../components/ItemizedReceivingModal';
 import GpsMapPin from '../../components/GpsMapPin';
 import { logisticsAPI, authAPI, adminAPI, socket } from '../../api';
 import BiltyModal from '../../components/BiltyModal';
@@ -54,6 +56,7 @@ export default function TransporterDashboard() {
   const [trucksViewMode, setTrucksViewMode] = useState('grid'); // 'grid' | 'radar'
 
   // Action states
+  const [verifyingCargo, setVerifyingCargo] = useState(null); // cargo object currently undergoing itemized verification
   const [rejectingCargoId, setRejectingCargoId] = useState(null);
   const [rejectionReason, setRejectionReason] = useState('');
 
@@ -102,6 +105,11 @@ export default function TransporterDashboard() {
         e.preventDefault();
         return;
       }
+      if (verifyingCargo) {
+        setVerifyingCargo(null);
+        e.preventDefault();
+        return;
+      }
       if (showAssignModal) {
         setShowAssignModal(false);
         e.preventDefault();
@@ -125,7 +133,7 @@ export default function TransporterDashboard() {
     };
     window.addEventListener('ecargo:ui-back', onUiBack);
     return () => window.removeEventListener('ecargo:ui-back', onUiBack);
-  }, [biltyModalBooking, showAssignModal, rejectingCargoId, selectedBooking, activeTab]);
+  }, [biltyModalBooking, verifyingCargo, showAssignModal, rejectingCargoId, selectedBooking, activeTab]);
 
   const fetchData = async () => {
     if (currentUser) {
@@ -265,6 +273,38 @@ export default function TransporterDashboard() {
     } catch (error) {
       console.error(error);
       toast.error(error.response?.data?.message || 'Failed to reject cargo request.');
+    } finally {
+      setIsSubmittingAction(false);
+    }
+  };
+
+  const handleConfirmVerification = async (verificationPayload) => {
+    if (!verifyingCargo || isSubmittingAction) return;
+    setIsSubmittingAction(true);
+    try {
+      const cargoId = verifyingCargo._id || verifyingCargo.id;
+      await logisticsAPI.respondToCargo(cargoId, verificationPayload);
+
+      if (verificationPayload.hasShortage) {
+        toast.warning(
+          isUrdu
+            ? `شارٹیج کی توثیق درج کرلی گئی۔ وصول شدہ اشیاء: ${verificationPayload.receivingVerification?.totalReceivedQty || ''} (کمی: ${verificationPayload.receivingVerification?.totalShortageQty || ''} اشیاء)`
+            : `Shortage Endorsement recorded! Accepted ${verificationPayload.receivingVerification?.totalReceivedQty} units (${verificationPayload.receivingVerification?.totalShortageQty} missing).`
+        );
+      } else if (verificationPayload.status === 'Rejected') {
+        toast.info(isUrdu ? 'کارگو شارٹیج کی وجہ سے مسترد کر دیا گیا' : 'Consignment rejected due to missing cargo.');
+      } else {
+        toast.success(
+          isUrdu
+            ? 'تمام اشیاء کی مکمل تصدیق ہوگئی! مال قبول کرلیا گیا۔'
+            : 'All items verified and accepted! Ready for truck dispatch.'
+        );
+      }
+      setVerifyingCargo(null);
+      fetchData();
+    } catch (e) {
+      console.error(e);
+      toast.error(e.response?.data?.message || 'Failed to submit receiving verification.');
     } finally {
       setIsSubmittingAction(false);
     }
@@ -531,12 +571,31 @@ export default function TransporterDashboard() {
                         {req.chargeableWeight ? `${formatWeightTons(req.chargeableWeight)} (Chargeable)` : formatWeightTons(req.weight)}
                         {req.packagingType && <span className="ml-2 text-slate-600 font-sans">&bull; {req.packagingType}</span>}
                       </p>
-                      {reqProducts.map((p, idx) => (
-                        <p key={idx} className="text-xs text-slate-600 font-mono">
-                          &middot; {p.name || p.title} ({p.quantity || p.qty || '1'} units)
-                          {p.length && p.width && p.height ? ` [${p.length}x${p.width}x${p.height}cm]` : ''}
-                        </p>
-                      ))}
+                      {reqProducts.map((p, idx) => {
+                        const isShort = p.receivedQty !== undefined && Number(p.receivedQty) < Number(p.quantity || p.qty || 1);
+                        return (
+                          <p key={idx} className="text-xs text-slate-600 dark:text-slate-400 font-mono flex items-center justify-between">
+                            <span>
+                              &middot; {p.name || p.title} ({p.quantity || p.qty || '1'} units)
+                              {p.length && p.width && p.height ? ` [${p.length}x${p.width}x${p.height}cm]` : ''}
+                            </span>
+                            {isShort && (
+                              <span className="text-[10px] text-amber-700 dark:text-amber-300 font-bold bg-amber-100 dark:bg-amber-950 px-1.5 py-0.2 rounded border border-amber-300 dark:border-amber-700">
+                                Recv: {p.receivedQty}
+                              </span>
+                            )}
+                          </p>
+                        );
+                      })}
+                      {req.hasShortage && (
+                        <div className="bg-amber-100/80 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-700/60 text-amber-900 dark:text-amber-200 text-[11px] font-bold px-2.5 py-1.5 rounded-lg flex items-start gap-1.5 mt-2">
+                          <AlertTriangle size={14} className="text-amber-600 shrink-0 mt-0.5" />
+                          <div>
+                            <span>Shortage Endorsed: {req.receivingVerification?.totalReceivedQty} of {req.receivingVerification?.totalDeclaredQty} units received ({req.receivingVerification?.totalShortageQty} missing).</span>
+                            {req.shortageNote && <p className="text-[10px] font-normal italic mt-0.5">"{req.shortageNote}"</p>}
+                          </div>
+                        </div>
+                      )}
 
                       {/* Special Handling Badges */}
                       {(() => {
@@ -708,25 +767,38 @@ export default function TransporterDashboard() {
                 ) : (
                   <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-2">
                     <button 
-                      onClick={() => handleCargoResponse(req._id || req.id, 'Accepted', { fareStatus: 'Agreed' })}
+                      type="button"
+                      onClick={() => setVerifyingCargo(req)}
                       className="flex-1 btn-primary text-xs sm:text-sm font-bold py-2.5 rounded-xl cursor-pointer flex items-center justify-center gap-2 shadow-md"
+                      title="Inspect items, verify received count at dock, and record shortage"
                     >
-                      <CheckCircle size={16} />
-                      <span>{isUrdu ? 'ٹھیک ہے / پیشکش قبول کریں' : 'Accept Customer Offer'} (Rs. {Number(req.totalFare || req.baseFare || 0).toLocaleString()})</span>
+                      <ClipboardCheck size={16} />
+                      <span>{isUrdu ? 'اشیاء کی تصدیق و وصولی' : 'Verify & Receive Items'} ({reqProducts.length || 1})</span>
                     </button>
                     <button 
+                      type="button"
+                      onClick={() => handleCargoResponse(req._id || req.id, 'Accepted', { fareStatus: 'Agreed' })}
+                      className="btn-outline border-emerald-400 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-xs sm:text-sm font-bold py-2.5 px-3 rounded-xl cursor-pointer flex items-center justify-center gap-1.5"
+                      title="Quick accept with full count"
+                    >
+                      <CheckCircle size={15} />
+                      <span>{isUrdu ? 'مکمل قبول' : 'Quick Accept'}</span>
+                    </button>
+                    <button 
+                      type="button"
                       onClick={() => {
                         setBargainingCargoId(req._id || req.id);
                         const currentFare = parseFloat(req.totalFare || req.baseFare || 50000);
                         setTransporterCounterFare(String(currentFare + 5000));
                         setTransporterCounterNote('');
                       }}
-                      className="flex-1 btn-outline border-orange-400 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-950/30 text-xs sm:text-sm font-bold py-2.5 rounded-xl cursor-pointer flex items-center justify-center gap-2 shadow-2xs"
+                      className="btn-outline border-orange-400 text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-950/30 text-xs sm:text-sm font-bold py-2.5 px-3 rounded-xl cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs"
                     >
                       <TrendingUp size={16} className="text-orange-600" />
-                      <span>{isUrdu ? 'کرایہ بڑھائیں (Bargain)' : 'Increase Fare / Counter'}</span>
+                      <span>{isUrdu ? 'کرایہ بڑھائیں' : 'Bargain'}</span>
                     </button>
                     <button 
+                      type="button"
                       onClick={() => handleCargoResponse(req._id || req.id, 'Rejected')}
                       className="btn-outline text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30 text-xs sm:text-sm font-bold py-2.5 px-3 rounded-xl cursor-pointer flex items-center justify-center gap-1.5"
                     >
@@ -1738,6 +1810,18 @@ export default function TransporterDashboard() {
           </div>
         );
       })()}
+
+      {/* Itemized Receiving & Shortage Verification Modal */}
+      {verifyingCargo && (
+        <ItemizedReceivingModal
+          isOpen={Boolean(verifyingCargo)}
+          cargo={verifyingCargo}
+          onClose={() => setVerifyingCargo(null)}
+          onConfirmVerification={handleConfirmVerification}
+          isSubmitting={isSubmittingAction}
+          isUrdu={isUrdu}
+        />
+      )}
 
       {/* Bilty PDF Preview Modal */}
       <BiltyModal
