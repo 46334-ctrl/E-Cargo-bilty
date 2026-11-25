@@ -5,7 +5,7 @@ import {
   Users, FileText, Activity, AlertTriangle, Check, X, Shield,
   Package, Trash2, CheckCircle, Loader2, ArrowRight, Truck,
   Mail, Phone, Clock, Eye, AlertCircle, FileCheck, Ban, Unlock,
-  MessageSquare, QrCode, Send, Search, Radio
+  MessageSquare, QrCode, Send, Search, Radio, RefreshCw, LogOut
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import QRCode from 'qrcode';
@@ -67,10 +67,46 @@ export default function AdminDashboard() {
   const [whatsappStatus, setWhatsappStatus] = useState({ status: 'disconnected', isReady: false, hasQr: false, qr: null });
   const [whatsappModalOpen, setWhatsappModalOpen] = useState(false);
   const [whatsappQrDataUrl, setWhatsappQrDataUrl] = useState('');
+  const [refreshingWhatsApp, setRefreshingWhatsApp] = useState(false);
   const [testPhone, setTestPhone] = useState('');
   const [testMessage, setTestMessage] = useState('');
   const [testSending, setTestSending] = useState(false);
   const [testResult, setTestResult] = useState(null);
+
+  const fetchWhatsAppStatus = async () => {
+    try {
+      const res = await adminAPI.getWhatsAppStatus();
+      setWhatsappStatus(res.data);
+      if (res.data?.qr) {
+        const url = await QRCode.toDataURL(res.data.qr, { margin: 1, width: 260 });
+        setWhatsappQrDataUrl(url);
+      } else if (res.data?.isReady) {
+        setWhatsappQrDataUrl('');
+      }
+    } catch (e) {
+      console.error('Failed to get WhatsApp status:', e);
+    }
+  };
+
+  const handleRestartWhatsApp = async (clearSession = false) => {
+    setRefreshingWhatsApp(true);
+    setWhatsappQrDataUrl('');
+    try {
+      await adminAPI.restartWhatsApp(clearSession);
+      toast.info(clearSession ? 'Resetting WhatsApp session. New QR generating...' : 'Restarting WhatsApp gateway...');
+      setTimeout(fetchWhatsAppStatus, 2500);
+    } catch (err) {
+      toast.error('Failed to restart WhatsApp: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setTimeout(() => setRefreshingWhatsApp(false), 2500);
+    }
+  };
+
+  useEffect(() => {
+    if (whatsappModalOpen) {
+      fetchWhatsAppStatus();
+    }
+  }, [whatsappModalOpen]);
 
   useEffect(() => {
     const onUiBack = (e) => {
@@ -1589,7 +1625,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* QR Code Section (if waiting for link) */}
-            {!whatsappStatus.isReady && (
+            {!whatsappStatus.isReady ? (
               <div className="flex flex-col items-center justify-center p-4 bg-slate-50 border border-slate-200 rounded-xl mb-5 text-center">
                 <p className="text-xs font-bold text-slate-700 mb-3">
                   Open WhatsApp on your phone ➔ Linked Devices ➔ Link a Device ➔ Scan:
@@ -1601,10 +1637,56 @@ export default function AdminDashboard() {
                 ) : (
                   <div className="w-56 h-56 flex flex-col items-center justify-center bg-white border border-dashed border-slate-300 rounded-xl">
                     <QrCode size={40} className="text-slate-400 animate-pulse mb-2" />
-                    <span className="text-xs text-slate-500">Generating live QR code...</span>
+                    <span className="text-xs text-slate-500 font-medium">Generating live QR code...</span>
+                    <span className="text-[11px] text-slate-400 mt-1">Please wait a few seconds</span>
                   </div>
                 )}
+
+                <div className="flex flex-wrap items-center justify-center gap-2 mt-4">
+                  <button
+                    type="button"
+                    disabled={refreshingWhatsApp}
+                    onClick={() => handleRestartWhatsApp(false)}
+                    className="px-3 py-1.5 text-xs font-semibold bg-slate-200 hover:bg-slate-300 dark:bg-white/10 dark:hover:bg-white/20 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer text-slate-700 dark:text-slate-200"
+                  >
+                    <RefreshCw size={13} className={refreshingWhatsApp ? 'animate-spin' : ''} />
+                    <span>{refreshingWhatsApp ? 'Refreshing...' : 'Refresh QR Code'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={refreshingWhatsApp}
+                    onClick={() => {
+                      if (window.confirm('Reset WhatsApp session? You will need to scan a new QR code.')) {
+                        handleRestartWhatsApp(true);
+                      }
+                    }}
+                    className="px-3 py-1.5 text-xs font-semibold bg-rose-50 hover:bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer"
+                  >
+                    <LogOut size={13} />
+                    <span>Reset Session</span>
+                  </button>
+                </div>
+
                 <p className="text-[11px] text-slate-500 mt-3">Session is saved locally in <code className="bg-slate-200 px-1 py-0.5 rounded font-mono">.wwebjs_auth</code>. You only scan once.</p>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between p-3.5 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-xl mb-5 text-xs">
+                <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-200 font-semibold">
+                  <CheckCircle size={16} className="text-emerald-600 shrink-0" />
+                  <span>WhatsApp client connected {whatsappStatus.myNumber ? `(${whatsappStatus.myNumber})` : ''}</span>
+                </div>
+                <button
+                  type="button"
+                  disabled={refreshingWhatsApp}
+                  onClick={() => {
+                    if (window.confirm('Disconnect WhatsApp? This will log out the active session.')) {
+                      handleRestartWhatsApp(true);
+                    }
+                  }}
+                  className="px-2.5 py-1 text-[11px] font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-100/50 rounded-lg transition-all cursor-pointer"
+                >
+                  Disconnect
+                </button>
               </div>
             )}
 

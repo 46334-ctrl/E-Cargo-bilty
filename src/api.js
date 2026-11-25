@@ -329,6 +329,7 @@ export const adminAPI = {
   getActivity: () => api.get('/admin/activity'),
   getWhatsAppStatus: () => api.get('/whatsapp/status'),
   sendWhatsAppTest: (data) => api.post('/whatsapp/test', data),
+  restartWhatsApp: (clearSession = false) => api.post('/whatsapp/restart', { clearSession }),
 };
 
 export const lostCargoAPI = {

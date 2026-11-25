@@ -173,6 +173,47 @@ const initWhatsApp = (io = null) => {
 };
 
 /**
+ * Restarts or resets WhatsApp Web Client
+ */
+const restartWhatsApp = async (clearSession = false) => {
+  console.log(`🔄 Restarting WhatsApp Web Client (clearSession: ${clearSession})...`);
+  try {
+    if (client) {
+      try {
+        await client.destroy();
+      } catch (err) {
+        console.warn('Error destroying existing WhatsApp client:', err.message);
+      }
+      client = null;
+    }
+    isReady = false;
+    latestQr = null;
+    clientStatus = 'initializing';
+    if (ioInstance) {
+      ioInstance.emit('whatsapp_status', { status: 'initializing' });
+    }
+
+    if (clearSession) {
+      const authDir = path.join(__dirname, '../.wwebjs_auth');
+      if (fs.existsSync(authDir)) {
+        try {
+          fs.rmSync(authDir, { recursive: true, force: true });
+          console.log('🗑️ Removed existing WhatsApp session folder');
+        } catch (e) {
+          console.warn('Could not remove auth directory:', e.message);
+        }
+      }
+    }
+
+    initWhatsApp(ioInstance);
+    return { success: true, message: 'WhatsApp client restarting' };
+  } catch (error) {
+    clientStatus = 'error';
+    return { success: false, error: error.message };
+  }
+};
+
+/**
  * Core function to send a text message via WhatsApp
  */
 const sendWhatsAppMessage = async (rawPhone, messageText) => {
@@ -399,6 +440,7 @@ const notifyDeliveryCompleted = async (booking, cargo, shipper, recipients = [])
 
 module.exports = {
   initWhatsApp,
+  restartWhatsApp,
   sendWhatsAppMessage,
   formatPhoneNumber,
   notifyCargoCreated,

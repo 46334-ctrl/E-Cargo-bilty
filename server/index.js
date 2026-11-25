@@ -15,6 +15,7 @@ const { autoSeedDatabase } = require('./autoSeed');
 const { parseWeightToKg, formatWeightDisplay, computeCapacityMetrics } = require('./utils/capacity');
 const {
   initWhatsApp,
+  restartWhatsApp,
   sendWhatsAppMessage,
   notifyCargoCreated,
   notifyBookingOffer,
@@ -255,6 +256,12 @@ initWhatsApp(io);
 // ─── WhatsApp Status & Test Endpoints ────────────────────────────────────────
 app.get('/api/whatsapp/status', authMiddleware, (req, res) => {
   res.json(getWhatsAppStatus());
+});
+
+app.post('/api/whatsapp/restart', authMiddleware, async (req, res) => {
+  const { clearSession } = req.body || {};
+  const result = await restartWhatsApp(Boolean(clearSession));
+  res.json(result);
 });
 
 app.post('/api/whatsapp/test', authMiddleware, async (req, res) => {
