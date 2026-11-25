@@ -186,7 +186,7 @@ export default function AdminDashboard() {
     });
 
     socket.on('whatsapp_status', (data) => {
-      setWhatsappStatus(prev => ({ ...prev, status: data.status, isReady: data.status === 'ready' }));
+      setWhatsappStatus(prev => ({ ...prev, status: data.status, isReady: data.status === 'ready', error: data.error || null }));
       if (data.status === 'ready') {
         setWhatsappQrDataUrl('');
       }
@@ -1603,26 +1603,54 @@ export default function AdminDashboard() {
             </div>
 
             {/* Connection Status Banner */}
-            <div className={`p-3.5 sm:p-4 rounded-xl border mb-5 flex flex-wrap items-center justify-between gap-2 ${whatsappStatus.isReady
+            <div className={`p-3.5 sm:p-4 rounded-xl border mb-4 flex flex-wrap items-center justify-between gap-2 ${
+                whatsappStatus.isReady
                 ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
-                : whatsappStatus.hasQr
-                  ? 'bg-amber-50 border-amber-300 text-amber-900'
-                  : 'bg-slate-100 border-slate-300 text-slate-800'
+                : whatsappStatus.status === 'error'
+                  ? 'bg-rose-50 border-rose-300 text-rose-900'
+                  : whatsappStatus.hasQr
+                    ? 'bg-amber-50 border-amber-300 text-amber-900'
+                    : 'bg-slate-100 border-slate-300 text-slate-800'
               }`}>
               <div className="flex items-center gap-2">
-                <span className={`w-3 h-3 rounded-full ${whatsappStatus.isReady ? 'bg-emerald-500' : whatsappStatus.hasQr ? 'bg-amber-500 animate-pulse' : 'bg-slate-400'}`} />
+                <span className={`w-3 h-3 rounded-full ${
+                  whatsappStatus.isReady
+                    ? 'bg-emerald-500'
+                    : whatsappStatus.status === 'error'
+                      ? 'bg-rose-500'
+                      : whatsappStatus.hasQr
+                        ? 'bg-amber-500 animate-pulse'
+                        : 'bg-slate-400'
+                }`} />
                 <span className="font-extrabold text-sm">
                   {whatsappStatus.isReady
                     ? 'Gateway Online & Authenticated'
-                    : whatsappStatus.hasQr
-                      ? 'Action Required: Scan QR Code'
-                      : 'Gateway Initializing...'}
+                    : whatsappStatus.status === 'error'
+                      ? 'Gateway Error: Failed to Start Browser'
+                      : whatsappStatus.hasQr
+                        ? 'Action Required: Scan QR Code'
+                        : 'Gateway Initializing...'}
                 </span>
               </div>
-              <span className="text-xs font-mono px-2 py-0.5 rounded bg-white/80 border text-slate-700 uppercase">
+              <span className={`text-xs font-mono px-2 py-0.5 rounded border uppercase ${
+                whatsappStatus.status === 'error' ? 'bg-rose-100 text-rose-700 border-rose-300 font-bold' : 'bg-white/80 text-slate-700'
+              }`}>
                 {whatsappStatus.status}
               </span>
             </div>
+
+            {/* Error Message Details if in error state */}
+            {whatsappStatus.status === 'error' && whatsappStatus.error && (
+              <div className="mb-4 p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-xl text-xs text-rose-800 dark:text-rose-200">
+                <div className="flex items-start gap-2">
+                  <AlertCircle size={15} className="text-rose-600 shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <p className="font-bold">Error Detail:</p>
+                    <p className="font-mono text-[11px] break-words mt-0.5 opacity-90">{whatsappStatus.error}</p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* QR Code Section (if waiting for link) */}
             {!whatsappStatus.isReady ? (

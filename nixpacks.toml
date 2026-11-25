@@ -1,0 +1,23 @@
+[phases.setup]
+nixPkgs = [
+  "nodejs_22",
+  "chromium",
+  "nss",
+  "nspr",
+  "atk",
+  "cups",
+  "dbus",
+  "libdrm",
+  "mesa",
+  "libgbm",
+  "alsa-lib",
+  "gtk3",
+  "pango",
+  "cairo"
+]
+
+[phases.build]
+cmds = ["npm run build", "npm --prefix server install"]
+
+[start]
+cmd = "npm start"

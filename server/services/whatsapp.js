@@ -7,21 +7,39 @@ const fs = require('fs');
 let client = null;
 let isReady = false;
 let latestQr = null;
+let lastError = null;
 let clientStatus = 'disconnected'; // 'disconnected' | 'initializing' | 'qr_ready' | 'authenticated' | 'ready' | 'error'
 let ioInstance = null;
 
 const findChromeExecutable = () => {
+  if (process.env.PUPPETEER_EXECUTABLE_PATH && fs.existsSync(process.env.PUPPETEER_EXECUTABLE_PATH)) {
+    return process.env.PUPPETEER_EXECUTABLE_PATH;
+  }
+
   const candidatePaths = [
-    process.env.PUPPETEER_EXECUTABLE_PATH,
+    '/usr/bin/google-chrome-stable',
+    '/usr/bin/google-chrome',
+    '/usr/bin/chromium',
+    '/usr/bin/chromium-browser',
+    '/etc/profiles/per-user/root/bin/chromium',
     'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
     'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
     'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
     'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe'
-  ].filter(Boolean);
+  ];
 
   for (const p of candidatePaths) {
     if (fs.existsSync(p)) return p;
   }
+
+  if (process.platform === 'linux') {
+    try {
+      const { execSync } = require('child_process');
+      const whichPath = execSync('which chromium || which google-chrome || which chromium-browser || which google-chrome-stable', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+      if (whichPath && fs.existsSync(whichPath)) return whichPath;
+    } catch (e) {}
+  }
+
   return undefined;
 };
 
@@ -164,11 +182,19 @@ const initWhatsApp = (io = null) => {
 
     client.initialize().catch((err) => {
       clientStatus = 'error';
-      console.warn('⚠️ WhatsApp Web failed to start headless browser:', err.message);
+      lastError = err?.message || String(err);
+      console.warn('⚠️ WhatsApp Web failed to start headless browser:', lastError);
+      if (ioInstance) {
+        ioInstance.emit('whatsapp_status', { status: 'error', error: lastError });
+      }
     });
   } catch (error) {
     clientStatus = 'error';
-    console.warn('⚠️ Error during WhatsApp initialization:', error.message);
+    lastError = error?.message || String(error);
+    console.warn('⚠️ Error during WhatsApp initialization:', lastError);
+    if (ioInstance) {
+      ioInstance.emit('whatsapp_status', { status: 'error', error: lastError });
+    }
   }
 };
 
@@ -188,6 +214,7 @@ const restartWhatsApp = async (clearSession = false) => {
     }
     isReady = false;
     latestQr = null;
+    lastError = null;
     clientStatus = 'initializing';
     if (ioInstance) {
       ioInstance.emit('whatsapp_status', { status: 'initializing' });
@@ -209,7 +236,8 @@ const restartWhatsApp = async (clearSession = false) => {
     return { success: true, message: 'WhatsApp client restarting' };
   } catch (error) {
     clientStatus = 'error';
-    return { success: false, error: error.message };
+    lastError = error?.message || String(error);
+    return { success: false, error: lastError };
   }
 };
 
@@ -452,6 +480,7 @@ module.exports = {
     isReady,
     hasQr: Boolean(latestQr),
     qr: latestQr,
+    error: lastError,
     myNumber: client?.info?.wid?.user || null
   })
 };
