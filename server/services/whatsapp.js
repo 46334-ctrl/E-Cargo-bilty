@@ -126,6 +126,9 @@ const initWhatsApp = (io = null) => {
       authStrategy: new LocalAuth({
         dataPath: path.join(__dirname, '../.wwebjs_auth')
       }),
+      authTimeoutMs: 120000, // 2 minutes (prevents 'auth timeout' on cloud containers like Railway)
+      takeoverOnConflict: true,
+      takeoverTimeoutMs: 10000,
       puppeteer: puppeteerConfig
     });
 

@@ -1653,6 +1653,11 @@ export default function AdminDashboard() {
                   <div className="min-w-0">
                     <p className="font-bold">Error Detail:</p>
                     <p className="font-mono text-[11px] break-words mt-0.5 opacity-90">{whatsappStatus.error}</p>
+                    {String(whatsappStatus.error).includes('timeout') && (
+                      <p className="text-[11px] font-sans font-semibold text-rose-700 dark:text-rose-300 mt-1.5">
+                        💡 Initial page load took longer than expected on the server. Please click <strong>"Refresh QR Code"</strong> or <strong>"Reset Session"</strong> below to reload.
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
