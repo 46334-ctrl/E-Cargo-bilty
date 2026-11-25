@@ -202,7 +202,7 @@ export default function TransporterDashboard() {
     setIsSubmittingAction(true);
     try {
       await logisticsAPI.respondToCargo(cargoId, { status, ...extra });
-      toast.success(isUrdu ? 'کارگو پیشکش قبول کرلی گئی! اب آپ اس پر ٹرک روانہ کر سکتے ہیں۔' : 'Cargo request accepted! You can now dispatch a truck to it.');
+      toast.success(isUrdu ? 'کارگو قبول کر لیا گیا! اب "قبول شدہ (بغیر ٹرک)" ٹیب میں ٹرک الاٹ کریں۔' : 'Cargo request accepted! Moved to "Accepted (No Truck)" tab awaiting vehicle allocation.');
       fetchData();
     } catch (e) {
       console.error(e);
@@ -331,12 +331,52 @@ export default function TransporterDashboard() {
     setShowAssignModal(true);
   };
 
+  const openAssignModalForCargo = (cargo) => {
+    if (!availableTrucks || availableTrucks.length === 0) {
+      toast.error(isUrdu ? 'اس وقت کوئی گاڑی دستیاب نہیں ہے! برائے مہربانی پہلے بیڑے میں ٹرک شامل کریں۔' : 'No available fleet trucks found. Please register or clear a vehicle first.');
+      return;
+    }
+    setSelectedCargoForAssign(cargo);
+    const orig = cargo.origin || 'Lahore';
+    const dest = cargo.destination || 'Karachi';
+    const wt = cargo.chargeableWeight || cargo.weight || 15;
+    const wtKg = parseWeightToKg(wt, true);
+
+    setAssignOrigin(orig);
+    setAssignDestination(dest);
+    setAssignWeight(wt);
+    setAssignWeightUnit('ton');
+
+    // Find candidate truck with remaining capacity >= cargo weight, otherwise first truck
+    const candidateTruck = availableTrucks.find(truck => {
+      const tot = truck.total_capacity || parseWeightToKg(truck.capacity, true) || 0;
+      const used = truck.used_capacity || 0;
+      const rem = truck.remaining_capacity !== undefined ? truck.remaining_capacity : Math.max(0, tot - used);
+      return rem >= wtKg;
+    }) || availableTrucks[0];
+
+    setSelectedTruckForAssign(candidateTruck);
+    const vType = candidateTruck?.truckType || 'Full Body Truck';
+    setAssignVehicleType(vType);
+
+    const tariff = calculateFreightTariff({
+      origin: orig,
+      destination: dest,
+      chargeableTons: wt,
+      vehicleType: vType,
+      handlingFlags: cargo.specialHandling || []
+    });
+    setAssignPrice(cargo.totalFare || cargo.baseFare || tariff.totalFare || tariff.totalFreight);
+    setAssignFormErrors({});
+    setShowAssignModal(true);
+  };
+
   const handleCargoSelectInModal = (cargoId) => {
     if (!cargoId) {
       setSelectedCargoForAssign(null);
       return;
     }
-    const cargo = cargoRequests.find(c => String(c._id) === String(cargoId) || Number(c._id) === Number(cargoId));
+    const cargo = cargoRequests.find(c => String(c._id) === String(cargoId) || String(c.id) === String(cargoId) || Number(c._id) === Number(cargoId));
     setSelectedCargoForAssign(cargo || null);
     if (cargo) {
       const orig = cargo.origin || assignOrigin;
@@ -472,6 +512,31 @@ export default function TransporterDashboard() {
 
   const pendingRequests = cargoRequests.filter(c => c.status === 'Pending');
 
+  // Cargo accepted by transporter but no truck has been assigned/dispatched yet
+  const assignedCargoIds = useMemo(() => new Set(
+    (bookings || [])
+      .filter(b => b.status !== 'Rejected' && b.status !== 'Cancelled')
+      .map(b => String(b.cargoId || b.cargo?._id || b.cargo?.id || ''))
+      .filter(Boolean)
+  ), [bookings]);
+
+  const acceptedUnassignedCargo = useMemo(() => {
+    return (cargoRequests || []).filter(c => {
+      const cid = String(c._id || c.id || '');
+      const isAccepted = c.status === 'Accepted';
+      const hasNoTruck = !c.assignedTruck || c.assignedTruck === '-' || c.assignedTruck === 'Unassigned';
+      const notInBookings = !assignedCargoIds.has(cid);
+      return isAccepted && (hasNoTruck || notInBookings);
+    });
+  }, [cargoRequests, assignedCargoIds]);
+
+  const totalAcceptedUnassignedTons = useMemo(() => {
+    return acceptedUnassignedCargo.reduce((acc, c) => {
+      const wt = convertToTons(c.chargeableWeight || c.weight || 0, 'ton');
+      return acc + (Number(wt) || 0);
+    }, 0);
+  }, [acceptedUnassignedCargo]);
+
   return (
     <div className="dash-dark-theme w-full min-w-0 max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-5 sm:py-8 relative page-enter">
       {/* Truck Poetry Banner */}
@@ -505,6 +570,7 @@ export default function TransporterDashboard() {
         <nav className="inline-flex min-w-full sm:min-w-0 items-center gap-1.5 p-1.5 rounded-2xl bg-[#0B1325]/96 border border-white/15 shadow-[0_12px_28px_rgba(0,0,0,0.45)]">
           {[
             { id: 'requests', name: isUrdu ? 'نئی کارگو درخواستیں' : 'Incoming Requests', badge: pendingRequests.length },
+            { id: 'unassigned', name: isUrdu ? 'قبول شدہ (بغیر ٹرک)' : 'Accepted (No Truck)', badge: acceptedUnassignedCargo.length, isAmber: true },
             { id: 'trucks', name: isUrdu ? 'دستیاب گاڑیاں' : 'Available Trucks' },
             { id: 'shipments', name: isUrdu ? 'فعال ترسیلات' : 'Active Shipments' },
             { id: 'lost_cargo', name: isUrdu ? 'گمشدہ کارگو پورٹل' : 'Lost Cargo Portal' },
@@ -525,7 +591,9 @@ export default function TransporterDashboard() {
               {tab.name}
               {tab.badge !== undefined && tab.badge > 0 && (
                 <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none ${
-                  activeTab === tab.id ? 'bg-white/25 text-white border border-white/30' : 'bg-orange-600 text-white animate-pulse shadow-sm'
+                  activeTab === tab.id 
+                    ? 'bg-white/25 text-white border border-white/30' 
+                    : (tab.isAmber ? 'bg-amber-400 text-slate-950 font-black animate-pulse shadow-sm' : 'bg-orange-600 text-white animate-pulse shadow-sm')
                 }`}>
                   {tab.badge}
                 </span>
@@ -541,6 +609,27 @@ export default function TransporterDashboard() {
         {/* REQUESTS TAB */}
         {activeTab === 'requests' && (
           <div className="space-y-6 text-left">
+            {/* Shortcut banner to accepted unassigned cargo if any */}
+            {acceptedUnassignedCargo.length > 0 && (
+              <div className="bg-amber-500/10 border border-amber-400/30 rounded-2xl p-3.5 px-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs">
+                <div className="flex items-center gap-2 text-amber-200 font-medium">
+                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping shrink-0" />
+                  <span>
+                    {isUrdu 
+                      ? `آپ کے پاس ${acceptedUnassignedCargo.length} قبول شدہ کارگو موجود ہیں جن پر ٹرک مختص کرنا باقی ہے۔` 
+                      : `You have ${acceptedUnassignedCargo.length} accepted shipment(s) waiting for fleet truck allocation.`}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('unassigned')}
+                  className="px-3 py-1 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1 shadow-sm"
+                >
+                  <span>{isUrdu ? 'قبول شدہ دیکھیں' : 'View Accepted (No Truck)'}</span>
+                  <ArrowRight size={12} />
+                </button>
+              </div>
+            )}
             {pendingRequests.map(req => {
               const reqProducts = Array.isArray(req.products) ? req.products : safeJsonParse(req.products, []);
               const reqPickup = (req.pickupDetails && typeof req.pickupDetails === 'object') ? req.pickupDetails : safeJsonParse(req.pickupDetails, {});
@@ -815,6 +904,265 @@ export default function TransporterDashboard() {
                 <CheckCircle className="w-10 h-10 text-emerald-600 mx-auto mb-2 opacity-70" />
                 <p className="font-bold text-slate-800">No incoming shipping requests found.</p>
                 <p className="text-xs text-slate-500 mt-1">All incoming shipments are processed!</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ACCEPTED (NO TRUCK DISPATCHED) TAB */}
+        {activeTab === 'unassigned' && (
+          <div className="space-y-6 text-left">
+            {/* Top Overview & Metric Banner */}
+            <div className="bg-[#0B1325]/96 border border-white/15 rounded-2xl p-4 sm:p-5 shadow-sm text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />
+                  <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
+                    {isUrdu ? 'قبول شدہ شپمنٹس (ٹرک الاٹمنٹ کا انتظار)' : 'Accepted Consignments Awaiting Truck Dispatch'}
+                  </h3>
+                </div>
+                <p className="text-xs text-slate-300">
+                  {isUrdu 
+                    ? 'یہ وہ کارگو ہیں جو آپ قبول کر چکے ہیں لیکن ابھی تک کوئی ٹرک مختص نہیں کیا۔ مال لوڈ کرنے کے لیے دستیاب گاڑی چن کر ڈرائیور کو روانہ کریں۔' 
+                    : 'Shipments accepted from corporate shippers but not yet assigned to any fleet carrier. Dispatch available trucks to begin transit.'}
+                </p>
+              </div>
+
+              {/* Quick Stat Chips */}
+              <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+                <div className="bg-white/10 border border-white/15 px-3 py-1.5 rounded-xl text-xs font-mono">
+                  <span className="text-slate-400 block text-[10px] uppercase font-sans font-bold">{isUrdu ? 'منتظر شپمنٹس' : 'Pending Trucks'}</span>
+                  <span className="text-amber-400 font-black text-sm">{acceptedUnassignedCargo.length} Orders</span>
+                </div>
+                <div className="bg-white/10 border border-white/15 px-3 py-1.5 rounded-xl text-xs font-mono">
+                  <span className="text-slate-400 block text-[10px] uppercase font-sans font-bold">{isUrdu ? 'کل وزن' : 'Total Payload'}</span>
+                  <span className="text-emerald-400 font-black text-sm">{totalAcceptedUnassignedTons.toFixed(1)} Tons</span>
+                </div>
+                <div className="bg-white/10 border border-white/15 px-3 py-1.5 rounded-xl text-xs font-mono">
+                  <span className="text-slate-400 block text-[10px] uppercase font-sans font-bold">{isUrdu ? 'دستیاب بیڑہ' : 'Available Fleet'}</span>
+                  <span className="text-orange-400 font-black text-sm">{availableTrucks.length} Trucks</span>
+                </div>
+              </div>
+            </div>
+
+            {/* List of Accepted Unassigned Shipments */}
+            {acceptedUnassignedCargo.map(req => {
+              const reqProducts = Array.isArray(req.products) ? req.products : safeJsonParse(req.products, []);
+              const reqPickup = (req.pickupDetails && typeof req.pickupDetails === 'object') ? req.pickupDetails : safeJsonParse(req.pickupDetails, {});
+              const reqRecipients = Array.isArray(req.recipients) ? req.recipients : safeJsonParse(req.recipients, []);
+              const totalItems = reqProducts.reduce((sum, p) => sum + (Number(p.quantity || p.qty || 1)), 0);
+              const totalShortage = reqProducts.reduce((sum, p) => {
+                const q = Number(p.quantity || p.qty || 1);
+                const r = p.receivedQty !== undefined ? Number(p.receivedQty) : q;
+                return sum + Math.max(0, q - r);
+              }, 0);
+              const isShortageVerified = totalShortage > 0 || (req.receivingEndorsement && req.receivingEndorsement.totalShortageCount > 0);
+
+              const reqDistance = getProximityDistance(req.origin || 'Lahore', req.destination || 'Karachi');
+
+              return (
+                <div key={req._id || req.id} className="bg-white border-2 border-amber-400/50 dark:border-amber-500/30 shadow-md rounded-2xl p-4 sm:p-6 space-y-4 relative overflow-hidden">
+                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500" />
+
+                  {/* Header Bar */}
+                  <div className="flex flex-wrap justify-between items-center gap-2 border-b border-slate-200 pb-3">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                        <FileText size={18} className="text-orange-600 shrink-0" />
+                        <span>REQ-{req.id || (req._id ? String(req._id).slice(0, 8) : '')}</span>
+                      </h3>
+                      <span className="text-xs text-slate-600 font-medium bg-slate-100 px-2.5 py-0.5 rounded-lg border border-slate-200">
+                        {req.businessOwnerName || 'Corporate Shipper'}
+                      </span>
+                      <span className="text-xs font-bold font-mono px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300 flex items-center gap-1">
+                        <Clock size={12} className="text-amber-600" />
+                        {isUrdu ? 'قبول شدہ • ٹرک درکار' : 'Accepted • Awaiting Truck'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-500 font-mono">
+                        {req.createdAt ? new Date(req.createdAt).toLocaleDateString() : 'Recent'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Split details column */}
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 text-sm">
+                    {/* Column 1: Consignment Specs */}
+                    <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-2">
+                      <div className="flex justify-between items-center">
+                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Consignment</p>
+                        <span className="text-[10px] font-mono font-bold text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">
+                          {reqProducts.length} Item types ({totalItems} Units)
+                        </span>
+                      </div>
+                      <p className="font-bold text-slate-900 text-sm mt-1">{req.title}</p>
+                      <p className="text-xs text-orange-700 font-bold font-mono">
+                        {req.chargeableWeight ? `${formatWeightTons(req.chargeableWeight)} (Chargeable)` : formatWeightTons(req.weight)}
+                        {req.packagingType && <span className="ml-2 text-slate-600 font-sans">&bull; {req.packagingType}</span>}
+                      </p>
+
+                      {/* Products preview */}
+                      <div className="max-h-28 overflow-y-auto space-y-1 pr-1 pt-1 border-t border-slate-200 mt-2">
+                        {reqProducts.map((p, idx) => {
+                          const isShort = p.receivedQty !== undefined && Number(p.receivedQty) < Number(p.quantity || p.qty || 1);
+                          return (
+                            <p key={idx} className="text-xs text-slate-600 font-mono flex items-center justify-between">
+                              <span className="truncate mr-2">
+                                &middot; {p.name || p.title} ({p.quantity || p.qty || '1'} units)
+                              </span>
+                              {isShort ? (
+                                <span className="text-[10px] text-red-600 font-bold shrink-0">
+                                  Rec: {p.receivedQty} (-{Number(p.quantity || p.qty || 1) - Number(p.receivedQty)})
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-emerald-600 font-bold shrink-0">Full</span>
+                              )}
+                            </p>
+                          );
+                        })}
+                      </div>
+
+                      {/* Shortage Endorsement Banner */}
+                      {isShortageVerified ? (
+                        <div className="bg-amber-50 border border-amber-300 rounded-lg p-2 text-xs text-amber-900 flex items-start gap-1.5 mt-2">
+                          <AlertTriangle size={14} className="text-amber-600 shrink-0 mt-0.5" />
+                          <div>
+                            <span className="font-bold block">Shortage Verified at Receiving:</span>
+                            <span className="text-[11px] text-amber-800">
+                              {totalShortage} units shortage recorded &amp; confirmed before dispatch.
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-2 text-xs text-emerald-900 flex items-center gap-1.5 mt-2">
+                          <CheckCircle size={14} className="text-emerald-600 shrink-0" />
+                          <span className="text-[11px] font-medium text-emerald-800">All items verified in full / ready for dispatch</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Column 2: Route & Pickup */}
+                    <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-2">
+                      <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Route &amp; Pickup Point</p>
+                      
+                      <div className="bg-white border border-slate-200 p-2.5 rounded-lg">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-slate-900 text-sm">{req.origin || 'Lahore'}</span>
+                          <span className="text-orange-600 font-bold">&rarr;</span>
+                          <span className="font-bold text-slate-900 text-sm">{req.destination || 'Karachi'}</span>
+                        </div>
+                        {reqDistance > 0 && (
+                          <p className="text-[10px] font-mono text-slate-500 text-right mt-0.5">
+                            🛣️ Route Distance: {reqDistance} km
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="text-xs text-slate-600 space-y-1 pt-1">
+                        <p><strong className="text-slate-800">Pickup:</strong> {reqPickup.address || 'Corporate Hub'}</p>
+                        <p><strong className="text-slate-800">Contact:</strong> {reqPickup.contactName || reqPickup.contact || '-'} ({reqPickup.phone || reqPickup.contactPhone || '-'})</p>
+                        {reqRecipients.length > 0 && (
+                          <p><strong className="text-slate-800">Drop-off:</strong> {reqRecipients[0].address || reqRecipients[0].city || req.destination}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Column 3: Agreed Price & Action Dispatch */}
+                    <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl flex flex-col justify-between space-y-3">
+                      <div>
+                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Agreed Consignment Fare</p>
+                        <div className="mt-1 flex items-baseline gap-2">
+                          <span className="text-2xl font-black text-slate-900 font-mono">
+                            Rs. {Number(req.totalFare || req.baseFare || 50000).toLocaleString()}
+                          </span>
+                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                            Agreed with Shipper
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-1">
+                          {isUrdu ? 'اب بیڑے میں سے دستیاب ٹرک چنیں اور ڈرائیور کو بکنگ آفر بھیجیں۔' : 'Assign any available vehicle in your fleet with matching payload capacity.'}
+                        </p>
+                      </div>
+
+                      {/* Action buttons */}
+                      <div className="space-y-2 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => openAssignModalForCargo(req)}
+                          className="w-full btn-primary text-xs sm:text-sm font-bold py-3 rounded-xl cursor-pointer flex items-center justify-center gap-2 shadow-md hover:brightness-110 transition-all"
+                        >
+                          <Truck size={17} />
+                          <span>{isUrdu ? 'گاڑی مقرر کریں و روانہ کریں' : 'Assign Truck & Dispatch'}</span>
+                          <ArrowRight size={15} />
+                        </button>
+
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setVerifyingCargo(req)}
+                            className="flex-1 btn-outline text-xs font-bold py-2 rounded-xl flex items-center justify-center gap-1.5 cursor-pointer hover:bg-slate-100"
+                            title="Re-open itemized dock verification"
+                          >
+                            <ClipboardCheck size={14} />
+                            <span>{isUrdu ? 'سامان کی پڑتال' : 'Inspect Items'}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleCargoResponse(req._id || req.id, 'Rejected')}
+                            className="btn-outline border-rose-200 text-rose-700 hover:bg-rose-50 text-xs font-bold py-2 px-3 rounded-xl cursor-pointer flex items-center justify-center gap-1"
+                            title="Release/Reject order"
+                          >
+                            <XCircle size={14} />
+                            <span>{isUrdu ? 'چھوڑیں' : 'Release'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Empty state */}
+            {acceptedUnassignedCargo.length === 0 && (
+              <div className="bg-white border border-slate-200 rounded-2xl p-12 sm:p-16 text-center text-slate-600 shadow-xs space-y-3">
+                <div className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center mx-auto mb-2">
+                  <CheckCircle size={32} />
+                </div>
+                <h4 className="text-lg font-bold text-slate-900">
+                  {isUrdu ? 'کوئی غیر تفویض شدہ کارگو نہیں ہے' : 'No Accepted Shipments Waiting for Trucks'}
+                </h4>
+                <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
+                  {isUrdu 
+                    ? 'تمام قبول شدہ کارگو پر گاڑیاں تفویض کی جا چکی ہیں، یا نئی درخواستیں موصول ہونے کا انتظار ہے۔' 
+                    : 'All accepted shipping orders currently have fleet trucks dispatched to them. When you accept new corporate consignments, they will appear here until a truck is assigned.'}
+                </p>
+                <div className="flex flex-wrap justify-center items-center gap-3 pt-3">
+                  <button
+                    onClick={() => setActiveTab('requests')}
+                    className="btn-primary text-xs font-bold px-4 py-2.5 rounded-xl cursor-pointer flex items-center gap-2"
+                  >
+                    <FileText size={14} />
+                    <span>{isUrdu ? 'نئی درخواستیں دیکھیں' : 'View Incoming Requests'} ({pendingRequests.length})</span>
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('trucks')}
+                    className="btn-outline text-xs font-bold px-4 py-2.5 rounded-xl cursor-pointer flex items-center gap-2"
+                  >
+                    <Truck size={14} />
+                    <span>{isUrdu ? 'دستیاب بیڑہ دیکھیں' : 'Inspect Available Fleet'} ({availableTrucks.length})</span>
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('shipments')}
+                    className="btn-outline text-xs font-bold px-4 py-2.5 rounded-xl cursor-pointer flex items-center gap-2"
+                  >
+                    <Activity size={14} />
+                    <span>{isUrdu ? 'فعال ترسیلات دیکھیں' : 'Active Shipments'} ({bookings.length})</span>
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -1136,6 +1484,33 @@ export default function TransporterDashboard() {
         {/* ACTIVE SHIPMENTS TAB */}
         {activeTab === 'shipments' && (
           <div className="space-y-4">
+            {/* Accepted unassigned alert banner if any */}
+            {acceptedUnassignedCargo.length > 0 && (
+              <div className="bg-gradient-to-r from-amber-500/15 via-orange-500/15 to-amber-500/10 border border-amber-400/40 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-left">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+                    <Truck size={18} />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-amber-300 uppercase tracking-wider">
+                      {isUrdu ? `${acceptedUnassignedCargo.length} قبول شدہ کارگو ٹرک الاٹمنٹ کے منتظر ہیں` : `${acceptedUnassignedCargo.length} Accepted Consignments Awaiting Fleet Dispatch`}
+                    </h4>
+                    <p className="text-xs text-slate-300 mt-0.5">
+                      {isUrdu ? 'ان شپمنٹس کو ٹرانسپورٹ گاڑی کے ساتھ جوڑیں تاکہ ترسیل شروع ہو سکے۔' : 'Match these accepted shipping orders with available trucks to begin delivery.'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('unassigned')}
+                  className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 text-xs font-bold transition-all shrink-0 cursor-pointer shadow-sm flex items-center gap-1.5"
+                >
+                  <span>{isUrdu ? 'دیکھیں و ٹرک مقرر کریں' : 'View & Assign Trucks'}</span>
+                  <ArrowRight size={13} />
+                </button>
+              </div>
+            )}
+
             <h3 className="text-xs font-bold text-slate-600 tracking-wider uppercase text-left">
               {bookings.filter(b => b.status !== 'Completed' && b.status !== 'Rejected').length} active transits in dispatch
             </h3>
@@ -1470,7 +1845,9 @@ export default function TransporterDashboard() {
 
       {/* Assign Truck popup form with Dynamic Fare Calculation */}
       {showAssignModal && selectedTruckForAssign && (() => {
-        const acceptedCargoList = cargoRequests.filter(c => c.status === 'Accepted');
+        const acceptedCargoList = acceptedUnassignedCargo.length > 0 
+          ? acceptedUnassignedCargo 
+          : cargoRequests.filter(c => c.status === 'Accepted' && (!c.assignedTruck || c.assignedTruck === '-'));
         const activeTariff = calculateFreightTariff({
           origin: assignOrigin || 'Lahore',
           destination: assignDestination || 'Karachi',
@@ -1560,12 +1937,51 @@ export default function TransporterDashboard() {
               </div>
 
               <form onSubmit={handleAssignConfirm} className="space-y-4 text-left">
+                {/* 1. Fleet Vehicle Selector (allows switching/picking truck) */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                      {isUrdu ? 'گاڑی (ٹرک) منتخب کریں' : 'Select Fleet Truck'} <span className="text-red-500">*</span>
+                    </label>
+                    <span className="text-[10px] font-mono text-slate-500">
+                      {availableTrucks.length} {isUrdu ? 'گاڑیاں دستیاب' : 'Vehicles in Fleet'}
+                    </span>
+                  </div>
+                  <select
+                    value={selectedTruckForAssign ? String(selectedTruckForAssign._id || selectedTruckForAssign.id) : ''}
+                    onChange={e => {
+                      const tr = availableTrucks.find(t => String(t._id || t.id) === e.target.value);
+                      setSelectedTruckForAssign(tr || null);
+                      if (tr) {
+                        setAssignVehicleType(tr.truckType || 'Full Body Truck');
+                      }
+                    }}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-slate-900 text-xs outline-none focus:bg-white focus:border-orange-500 cursor-pointer font-medium"
+                  >
+                    <option value="">{isUrdu ? '-- بیڑے سے گاڑی منتخب کریں --' : '-- Choose Vehicle from Fleet --'}</option>
+                    {availableTrucks.map(truck => {
+                      const tot = truck.total_capacity || parseWeightToKg(truck.capacity, true) || 0;
+                      const used = truck.used_capacity || 0;
+                      const rem = truck.remaining_capacity !== undefined ? truck.remaining_capacity : Math.max(0, tot - used);
+                      const isFull = rem <= 0;
+                      const cKg = selectedCargoForAssign ? parseWeightToKg(selectedCargoForAssign.chargeableWeight || selectedCargoForAssign.weight || assignWeight, true) : 0;
+                      const fits = !isFull && rem >= cKg;
+                      return (
+                        <option key={truck._id || truck.id} value={String(truck._id || truck.id)} disabled={isFull}>
+                          {truck.plateNumber} ({truck.truckType}) - {truck.loc} &bull; {isFull ? 'FULL' : `${rem.toLocaleString()} kg left`} {cKg > 0 ? (fits ? '✅ [Fits]' : '⚠️ [Over Capacity]') : ''}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                {/* 2. Accepted Consignment Selector */}
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                     Select Accepted Consignment Request <span className="text-red-500">*</span>
                   </label>
                   <select 
-                    value={selectedCargoForAssign ? String(selectedCargoForAssign._id) : ''}
+                    value={selectedCargoForAssign ? String(selectedCargoForAssign._id || selectedCargoForAssign.id) : ''}
                     onChange={e => {
                       handleCargoSelectInModal(e.target.value);
                       if (assignFormErrors.cargo) {
@@ -1589,8 +2005,8 @@ export default function TransporterDashboard() {
                       const cKg = parseWeightToKg(c.chargeableWeight || c.weight, true);
                       const fits = cKg <= truckRemainingKg;
                       return (
-                        <option key={c._id} value={String(c._id)}>
-                          REQ-{c._id}: {c.title} ({cKg.toLocaleString()} kg) &bull; {c.origin} &rarr; {c.destination} {fits ? '✅ [Fits]' : '⚠️ [Exceeds Capacity]'}
+                        <option key={c._id || c.id} value={String(c._id || c.id)}>
+                          REQ-{c.id || (c._id ? String(c._id).slice(0, 8) : '')}: {c.title} ({cKg.toLocaleString()} kg) &bull; {c.origin} &rarr; {c.destination} {fits ? '✅ [Fits]' : '⚠️ [Exceeds Capacity]'}
                         </option>
                       );
                     })}
