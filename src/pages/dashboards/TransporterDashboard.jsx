@@ -98,6 +98,31 @@ export default function TransporterDashboard() {
     return sortByProximity(availableTrucks, userCity, truck => truck.loc || 'Lahore', isUrdu);
   }, [availableTrucks, userCity, isUrdu]);
 
+  // Cargo accepted by transporter but no truck has been assigned/dispatched yet
+  const assignedCargoIds = useMemo(() => new Set(
+    (bookings || [])
+      .filter(b => b.status !== 'Rejected' && b.status !== 'Cancelled')
+      .map(b => String(b.cargoId || b.cargo?._id || b.cargo?.id || ''))
+      .filter(Boolean)
+  ), [bookings]);
+
+  const acceptedUnassignedCargo = useMemo(() => {
+    return (cargoRequests || []).filter(c => {
+      const cid = String(c._id || c.id || '');
+      const isAccepted = c.status === 'Accepted';
+      const hasNoTruck = !c.assignedTruck || c.assignedTruck === '-' || c.assignedTruck === 'Unassigned';
+      const notInBookings = !assignedCargoIds.has(cid);
+      return isAccepted && (hasNoTruck || notInBookings);
+    });
+  }, [cargoRequests, assignedCargoIds]);
+
+  const totalAcceptedUnassignedTons = useMemo(() => {
+    return acceptedUnassignedCargo.reduce((acc, c) => {
+      const wt = convertToTons(c.chargeableWeight || c.weight || 0, 'ton');
+      return acc + (Number(wt) || 0);
+    }, 0);
+  }, [acceptedUnassignedCargo]);
+
   useEffect(() => {
     const onUiBack = (e) => {
       if (biltyModalBooking) {
@@ -511,31 +536,6 @@ export default function TransporterDashboard() {
   }
 
   const pendingRequests = cargoRequests.filter(c => c.status === 'Pending');
-
-  // Cargo accepted by transporter but no truck has been assigned/dispatched yet
-  const assignedCargoIds = useMemo(() => new Set(
-    (bookings || [])
-      .filter(b => b.status !== 'Rejected' && b.status !== 'Cancelled')
-      .map(b => String(b.cargoId || b.cargo?._id || b.cargo?.id || ''))
-      .filter(Boolean)
-  ), [bookings]);
-
-  const acceptedUnassignedCargo = useMemo(() => {
-    return (cargoRequests || []).filter(c => {
-      const cid = String(c._id || c.id || '');
-      const isAccepted = c.status === 'Accepted';
-      const hasNoTruck = !c.assignedTruck || c.assignedTruck === '-' || c.assignedTruck === 'Unassigned';
-      const notInBookings = !assignedCargoIds.has(cid);
-      return isAccepted && (hasNoTruck || notInBookings);
-    });
-  }, [cargoRequests, assignedCargoIds]);
-
-  const totalAcceptedUnassignedTons = useMemo(() => {
-    return acceptedUnassignedCargo.reduce((acc, c) => {
-      const wt = convertToTons(c.chargeableWeight || c.weight || 0, 'ton');
-      return acc + (Number(wt) || 0);
-    }, 0);
-  }, [acceptedUnassignedCargo]);
 
   return (
     <div className="dash-dark-theme w-full min-w-0 max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-5 sm:py-8 relative page-enter">
