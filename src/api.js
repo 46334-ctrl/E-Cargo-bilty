@@ -303,6 +303,7 @@ export const logisticsAPI = {
   postCargo: (data) => api.post('/cargo', data),
   updateCargo: (id, data) => api.patch(`/cargo/${id}`, data),
   respondToCargo: (id, data) => api.patch(`/cargo/${id}/respond`, data),
+  verifyCargoPickup: (id, data) => api.post(`/cargo/${id}/verify-pickup`, data),
   deleteCargo: (id) => api.delete(`/cargo/${id}`),
   getBookings: (params) => api.get('/bookings', { params }),
   createBooking: (data) => api.post('/bookings', data),

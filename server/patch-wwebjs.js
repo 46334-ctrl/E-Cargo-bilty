@@ -158,6 +158,24 @@ if (content.includes(badAppStateOn)) {
   console.log('patch-wwebjs: Applied fix for AppState.on listener');
 }
 
+// 6. Patch waitForFunction('window.Debug?.VERSION != undefined') to prevent auth timeout on cloud containers
+const badWaitForVersion = `waitForFunction('window.Debug?.VERSION != undefined'`;
+const goodWaitForVersion = `waitForFunction('window.Debug?.VERSION != undefined || window.require != undefined || document.querySelector("canvas") != null'`;
+if (content.includes(badWaitForVersion)) {
+  content = content.replace(badWaitForVersion, goodWaitForVersion);
+  modified = true;
+  console.log('patch-wwebjs: Applied fix for waitForFunction window.Debug');
+}
+
+// 7. Patch getWWebVersion to safely fallback if Debug is undefined
+const badGetVersion = `return window.Debug.VERSION;`;
+const goodGetVersion = `return window.Debug?.VERSION || '2.3000.x';`;
+if (content.includes(badGetVersion)) {
+  content = content.replace(badGetVersion, goodGetVersion);
+  modified = true;
+  console.log('patch-wwebjs: Applied fix for getWWebVersion');
+}
+
 if (modified) {
   fs.writeFileSync(clientJsPath, content, 'utf8');
   console.log('patch-wwebjs: whatsapp-web.js successfully patched!');

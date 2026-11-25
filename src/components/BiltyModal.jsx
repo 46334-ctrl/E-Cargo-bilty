@@ -44,6 +44,7 @@ export default function BiltyModal({ booking, onClose }) {
     hasShortage: b.cargo?.hasShortage || b.hasShortage,
     shortageNote: b.cargo?.shortageNote || b.shortageNote,
     receivingVerification: b.cargo?.receivingVerification || b.receivingVerification,
+    isPickupVerified: Boolean(b.cargo?.receivingVerification || ['Loaded', 'In Transit', 'Delivered', 'Completed'].includes(b.cargo?.status || b.status)),
     cargo: b.cargo
   });
 
@@ -287,6 +288,18 @@ export default function BiltyModal({ booking, onClose }) {
                   {data.deliveryNotes && (
                     <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 text-xs text-slate-800">
                       <span className="font-bold text-orange-800">Delivery Notes: </span>{data.deliveryNotes}
+                    </div>
+                  )}
+
+                  {data.isPickupVerified && (
+                    <div className="bg-emerald-50 border border-emerald-300 rounded-xl p-3 flex flex-wrap items-center justify-between gap-2 shadow-2xs">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                        <span className="font-bold text-slate-900 text-xs">Origin Warehouse Handover:</span>
+                      </div>
+                      <span className="text-xs font-mono font-bold text-emerald-700 bg-white px-2.5 py-0.5 rounded-full border border-emerald-300">
+                        Pickup Verified: Yes (Handover OTP Authenticated)
+                      </span>
                     </div>
                   )}
 

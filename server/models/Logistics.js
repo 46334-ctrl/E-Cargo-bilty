@@ -127,7 +127,12 @@ const Cargo = sequelize.define('Cargo', {
   fareStatus: { type: DataTypes.STRING, defaultValue: 'Offered', field: 'fare_status' },
   receivingVerification: { type: DataTypes.JSON, defaultValue: null, field: 'receiving_verification' },
   hasShortage: { type: DataTypes.BOOLEAN, defaultValue: false, field: 'has_shortage' },
-  shortageNote: { type: DataTypes.TEXT, allowNull: true, field: 'shortage_note' }
+  shortageNote: { type: DataTypes.TEXT, allowNull: true, field: 'shortage_note' },
+  pickupCode: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    field: 'pickup_code'
+  }
 }, {
   tableName: 'cargo',
   timestamps: true,

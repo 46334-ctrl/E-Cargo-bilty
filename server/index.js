@@ -590,6 +590,11 @@ app.post('/api/cargo', authMiddleware, async (req, res) => {
     if (!data.fareStatus) {
       data.fareStatus = 'Offered';
     }
+
+    // Auto-generate 4-digit pickup OTP for physical gate-pass verification
+    if (!data.pickupCode) {
+      data.pickupCode = Math.floor(1000 + Math.random() * 9000).toString();
+    }
     const cargo = await Cargo.create(data);
 
     // Notify transporter about new cargo offer
@@ -747,6 +752,74 @@ app.patch('/api/cargo/:id/respond', authMiddleware, async (req, res) => {
 
     io.emit('booking_updated');
     res.json({ ...cargo.toJSON(), _id: cargo.id });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+app.post('/api/cargo/:id/verify-pickup', authMiddleware, async (req, res) => {
+  try {
+    const {
+      pickupOtp,
+      receivingVerification,
+      shortageNote,
+      hasShortage,
+      products,
+      chargeableWeight,
+      weight
+    } = req.body;
+
+    const cargo = await Cargo.findByPk(req.params.id);
+    if (!cargo) {
+      return res.status(404).json({ message: 'Cargo consignment not found.' });
+    }
+
+    const expectedOtp = String(cargo.pickupCode || '').trim();
+    const providedOtp = String(pickupOtp || '').trim();
+
+    if (!expectedOtp || expectedOtp !== providedOtp) {
+      return res.status(400).json({
+        message: 'Invalid Pickup OTP! Please collect the verified 4-digit code from the business shipper at the loading dock.'
+      });
+    }
+
+    const updateData = {
+      status: 'Loaded',
+      receivingVerification: receivingVerification || null,
+      hasShortage: Boolean(hasShortage),
+      shortageNote: shortageNote || null
+    };
+
+    if (products !== undefined) updateData.products = products;
+    if (chargeableWeight !== undefined) updateData.chargeableWeight = chargeableWeight;
+    if (weight !== undefined) updateData.weight = weight;
+
+    await Cargo.update(updateData, { where: { id: req.params.id } });
+    const updatedCargo = await Cargo.findByPk(req.params.id);
+
+    if (updatedCargo.businessOwnerId) {
+      if (hasShortage) {
+        const missingCount = receivingVerification?.totalShortageQty || 'some';
+        const receivedCount = receivingVerification?.totalReceivedQty || 'partial';
+        await sendNotification(
+          updatedCargo.businessOwnerId,
+          `📦 Cargo Handover Verified (Shortage Endorsed): Transporter verified and loaded '${updatedCargo.title}' via Pickup OTP. Received: ${receivedCount} (${missingCount} missing at dock). Note: "${shortageNote || 'Short delivery recorded by carrier'}"`
+        );
+      } else {
+        await sendNotification(
+          updatedCargo.businessOwnerId,
+          `📦 Cargo Handover Verified: Transporter has verified and loaded '${updatedCargo.title}' via Pickup OTP.`
+        );
+      }
+    }
+
+    io.emit('booking_updated');
+    res.json({
+      message: 'Warehouse pickup and cargo custody verified successfully!',
+      cargo: formatCargo(updatedCargo),
+      ...updatedCargo.toJSON(),
+      _id: updatedCargo.id
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -1745,6 +1818,7 @@ const ensureSqliteColumns = async () => {
     `ALTER TABLE cargo ADD COLUMN receiving_verification TEXT;`,
     `ALTER TABLE cargo ADD COLUMN has_shortage INTEGER DEFAULT 0;`,
     `ALTER TABLE cargo ADD COLUMN shortage_note TEXT;`,
+    `ALTER TABLE cargo ADD COLUMN pickup_code TEXT;`,
     `ALTER TABLE bookings ADD COLUMN delivery_code TEXT;`,
     `ALTER TABLE bookings ADD COLUMN receiver_signature TEXT;`,
     `ALTER TABLE bookings ADD COLUMN pod_photo_url TEXT;`,
@@ -1775,6 +1849,16 @@ sequelize.sync(isSqlite ? {} : { alter: true })
   .then(async () => {
     await ensureSqliteColumns();
     await autoSeedDatabase(sequelize);
+
+    // Auto-backfill 4-digit pickupCode for existing cargo if missing
+    try {
+      const cargosWithoutCode = await Cargo.findAll({ where: { pickupCode: null } });
+      for (const c of cargosWithoutCode) {
+        await c.update({ pickupCode: Math.floor(1000 + Math.random() * 9000).toString() });
+      }
+    } catch (e) {
+      // Column might be syncing
+    }
 
     // Auto-backfill totalCapacity from capacity string for existing trucks
     try {

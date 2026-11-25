@@ -1752,7 +1752,12 @@ export default function AdminDashboard() {
 
             {/* Quick Test Message Form */}
             <div className="border-t border-slate-200 pt-4">
-              <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-800 mb-2">Send Test WhatsApp Message</h4>
+              <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-800 mb-1.5">Send Test WhatsApp Message</h4>
+              {(!whatsappStatus.isReady && whatsappStatus.status !== 'authenticated') && (
+                <p className="text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2 mb-2">
+                  ⚠️ WhatsApp gateway is not linked yet. Scan the QR code above using your phone's <strong>WhatsApp ➔ Linked Devices</strong> to link and enable sending messages.
+                </p>
+              )}
               <div className="flex gap-2 mb-2">
                 <input
                   type="text"

@@ -308,22 +308,24 @@ export default function TransporterDashboard() {
     setIsSubmittingAction(true);
     try {
       const cargoId = verifyingCargo._id || verifyingCargo.id;
-      await logisticsAPI.respondToCargo(cargoId, verificationPayload);
-
-      if (verificationPayload.hasShortage) {
-        toast.warning(
-          isUrdu
-            ? `شارٹیج کی توثیق درج کرلی گئی۔ وصول شدہ اشیاء: ${verificationPayload.receivingVerification?.totalReceivedQty || ''} (کمی: ${verificationPayload.receivingVerification?.totalShortageQty || ''} اشیاء)`
-            : `Shortage Endorsement recorded! Accepted ${verificationPayload.receivingVerification?.totalReceivedQty} units (${verificationPayload.receivingVerification?.totalShortageQty} missing).`
-        );
-      } else if (verificationPayload.status === 'Rejected') {
+      if (verificationPayload.status === 'Rejected') {
+        await logisticsAPI.respondToCargo(cargoId, verificationPayload);
         toast.info(isUrdu ? 'کارگو شارٹیج کی وجہ سے مسترد کر دیا گیا' : 'Consignment rejected due to missing cargo.');
       } else {
-        toast.success(
-          isUrdu
-            ? 'تمام اشیاء کی مکمل تصدیق ہوگئی! مال قبول کرلیا گیا۔'
-            : 'All items verified and accepted! Ready for truck dispatch.'
-        );
+        await logisticsAPI.verifyCargoPickup(cargoId, verificationPayload);
+        if (verificationPayload.hasShortage) {
+          toast.warning(
+            isUrdu
+              ? `شِپر OTP اور شارٹیج کی توثیق درج! وصول شدہ: ${verificationPayload.receivingVerification?.totalReceivedQty || ''} (کمی: ${verificationPayload.receivingVerification?.totalShortageQty || ''} اشیاء)`
+              : `Shortage Endorsement recorded & OTP verified! Accepted ${verificationPayload.receivingVerification?.totalReceivedQty} units (${verificationPayload.receivingVerification?.totalShortageQty} missing).`
+          );
+        } else {
+          toast.success(
+            isUrdu
+              ? 'شِپر OTP اور تمام اشیاء کی تصدیق کامیاب! مال لوڈ کر لیا گیا۔'
+              : 'Warehouse OTP verified! Goods received and loaded successfully.'
+          );
+        }
       }
       setVerifyingCargo(null);
       fetchData();
@@ -859,19 +861,19 @@ export default function TransporterDashboard() {
                       type="button"
                       onClick={() => setVerifyingCargo(req)}
                       className="flex-1 btn-primary text-xs sm:text-sm font-bold py-2.5 rounded-xl cursor-pointer flex items-center justify-center gap-2 shadow-md"
-                      title="Inspect items, verify received count at dock, and record shortage"
+                      title="Inspect items, verify received count at dock, and authenticate with Shipper Handover OTP"
                     >
                       <ClipboardCheck size={16} />
-                      <span>{isUrdu ? 'اشیاء کی تصدیق و وصولی' : 'Verify & Receive Items'} ({reqProducts.length || 1})</span>
+                      <span>{isUrdu ? 'اشیاء کی تصدیق و وصولی (OTP)' : 'Verify & Receive Items (OTP)'} ({reqProducts.length || 1})</span>
                     </button>
                     <button 
                       type="button"
                       onClick={() => handleCargoResponse(req._id || req.id, 'Accepted', { fareStatus: 'Agreed' })}
                       className="btn-outline border-emerald-400 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-xs sm:text-sm font-bold py-2.5 px-3 rounded-xl cursor-pointer flex items-center justify-center gap-1.5"
-                      title="Quick accept with full count"
+                      title="Locks the commercial fare. Physical cargo receiving and Bilty activation still require dock OTP verification."
                     >
                       <CheckCircle size={15} />
-                      <span>{isUrdu ? 'مکمل قبول' : 'Quick Accept'}</span>
+                      <span>{isUrdu ? 'ریٹ قبول کریں (بغیر لوڈنگ)' : 'Accept Offer (Rate Only)'}</span>
                     </button>
                     <button 
                       type="button"
@@ -1103,10 +1105,10 @@ export default function TransporterDashboard() {
                             type="button"
                             onClick={() => setVerifyingCargo(req)}
                             className="flex-1 btn-outline text-xs font-bold py-2 rounded-xl flex items-center justify-center gap-1.5 cursor-pointer hover:bg-slate-100"
-                            title="Re-open itemized dock verification"
+                            title="Re-open itemized dock verification and authenticate with Shipper Handover OTP"
                           >
                             <ClipboardCheck size={14} />
-                            <span>{isUrdu ? 'سامان کی پڑتال' : 'Inspect Items'}</span>
+                            <span>{isUrdu ? 'سامان پڑتال (OTP)' : 'Inspect & OTP Verify'}</span>
                           </button>
 
                           <button

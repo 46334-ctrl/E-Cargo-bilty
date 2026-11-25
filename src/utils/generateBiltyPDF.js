@@ -301,6 +301,22 @@ const buildBiltyPDFDoc = async (biltyData) => {
   currentY += 11;
   doc.text('3. This e-Bilty serves as a verified legal carrier manifest under Pakistani Carriage of Goods by Road Act & Sales Tax Rules.', marginX + 20, currentY);
 
+  if (biltyData.isPickupVerified) {
+    currentY += 11;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(5, 150, 105);
+    doc.text('Origin Warehouse Handover: Pickup Verified (4-Digit Handover OTP Authenticated at Loading Dock)', marginX + 20, currentY);
+  }
+
+  if (biltyData.hasShortage && biltyData.receivingVerification) {
+    currentY += 11;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(217, 119, 6);
+    doc.text(`Carrier Shortage Endorsement: Received ${biltyData.receivingVerification.totalReceivedQty} of ${biltyData.receivingVerification.totalDeclaredQty} units (Shortage: ${biltyData.receivingVerification.totalShortageQty} missing).`, marginX + 20, currentY);
+  }
+
   // Signatures Section with Touchscreen e-POD embedding (clamped safely inside page border)
   currentY = Math.min(currentY + 55, pageHeight - marginY - 26);
   doc.setLineWidth(0.5);

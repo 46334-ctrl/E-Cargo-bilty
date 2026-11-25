@@ -6,7 +6,7 @@ import {
   Package, Trash2, CheckCircle, Loader2, ArrowRight, Truck,
   Mail, Phone, Clock, Eye, AlertCircle, FileCheck, Send, MessageSquare,
   Calendar, Plus, Info, Snowflake, Flame, ArrowUp, DollarSign, Calculator, Layers,
-  Handshake, TrendingUp, Coins, Repeat
+  Handshake, TrendingUp, Coins, Repeat, ShieldCheck, CheckCircle2
 } from 'lucide-react';
 import GpsMapPin from '../../components/GpsMapPin';
 import PostCargoIcon from '../../components/PostCargoIcon';
@@ -1829,9 +1829,23 @@ export default function BusinessDashboard() {
                                 </div>
                               )}
                             </div>
-                            <span className={`shrink-0 whitespace-nowrap px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${getStatusBadgeStyle(c.status)}`}>
-                              {c.status}
-                            </span>
+                            <div className="shrink-0 flex flex-col items-end gap-1.5">
+                              <span className={`whitespace-nowrap px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${getStatusBadgeStyle(c.status)}`}>
+                                {c.status}
+                              </span>
+                              {!isDraft && ['Pending', 'Accepted', 'Truck Assigned'].includes(c.status) && (
+                                <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-300 dark:bg-amber-950/60 dark:text-amber-200 dark:border-amber-700 flex items-center gap-1">
+                                  <ShieldCheck size={11} className="text-orange-600" />
+                                  <span>OTP: {c.pickupCode || '----'}</span>
+                                </span>
+                              )}
+                              {!isDraft && ['Loaded', 'In Transit', 'Delivered', 'Completed'].includes(c.status) && (
+                                <span className="font-mono text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-700 flex items-center gap-0.5">
+                                  <CheckCircle2 size={10} className="text-emerald-600" />
+                                  <span>Pickup Verified ✓</span>
+                                </span>
+                              )}
+                            </div>
                           </div>
                           {isDraft && (
                             <div className="flex justify-between items-center mt-3 pt-3 border-t border-slate-200">
@@ -1942,6 +1956,59 @@ export default function BusinessDashboard() {
                             </div>
                           );
                         })()}
+
+                        {/* Warehouse Pickup OTP & Gate-Pass Handover Security Card */}
+                        {['Pending', 'Accepted', 'Truck Assigned'].includes(selectedCargo.status) ? (
+                          <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/40 dark:to-orange-950/30 border-2 border-orange-400 dark:border-orange-500/60 p-4 sm:p-5 rounded-2xl shadow-sm space-y-2 mt-4 text-left">
+                            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-orange-200/80 dark:border-orange-500/30 pb-3">
+                              <div className="flex items-center gap-2.5">
+                                <ShieldCheck size={22} className="text-[#EA580C] shrink-0" />
+                                <div>
+                                  <h4 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white uppercase tracking-wider">
+                                    {isUrdu ? 'گودام گیٹ پاس او ٹی پی (Warehouse Pickup OTP)' : 'Warehouse Pickup OTP / Gate-Pass PIN'}
+                                  </h4>
+                                  <span className="text-[11px] text-orange-800 dark:text-orange-300 font-medium">
+                                    {isUrdu ? 'ڈاک پر مال کی لوڈنگ کی تصدیق کا خفیہ کوڈ' : 'Origin Dock Custody Handover PIN'}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="bg-white dark:bg-slate-900 border-2 border-orange-500 rounded-xl px-4 py-1.5 shadow-sm text-center">
+                                <span className="block text-[9px] font-bold text-slate-500 uppercase font-sans tracking-wider">{isUrdu ? 'خفیہ کوڈ' : 'SECRET PIN'}</span>
+                                <span className="font-mono font-black text-2xl text-orange-600 dark:text-orange-400 tracking-[0.25em]">
+                                  {selectedCargo.pickupCode || '----'}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex items-start gap-2 pt-1 text-xs text-slate-700 dark:text-slate-300">
+                              <AlertCircle size={15} className="text-amber-600 shrink-0 mt-0.5" />
+                              <p className="leading-relaxed">
+                                <strong>{isUrdu ? 'سیکیورٹی ہدایات: ' : 'Security Instruction: '}</strong>
+                                {isUrdu
+                                  ? 'یہ 4 ہندسوں کا کوڈ صرف اس وقت ٹرانسپورٹر / ڈرائیور کو بتائیں جب وہ فیکٹری/گودام پر سارا سامان ٹرک میں لوڈ اور شمار کر لے۔'
+                                  : 'Only share this 4-digit code with the transporter/driver after items are loaded and counted onto the truck.'}
+                              </p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-600/50 p-3 sm:p-4 rounded-2xl flex flex-wrap items-center justify-between gap-3 mt-4 text-xs text-left">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-xl bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 flex items-center justify-center shrink-0">
+                                <CheckCircle2 size={18} />
+                              </div>
+                              <div>
+                                <h4 className="font-bold text-emerald-950 dark:text-emerald-100 text-xs sm:text-sm">
+                                  {isUrdu ? 'گودام ہینڈ اوور کی توثیق مکمل ✓' : 'Warehouse Pickup Handover Verified ✓'}
+                                </h4>
+                                <p className="text-[11px] text-emerald-800 dark:text-emerald-300 mt-0.5">
+                                  {isUrdu ? 'ٹرانسپورٹر نے ڈاک پر خفیہ OTP اور سامان کی تصدیق کر لی ہے۔' : 'Transporter authenticated the 4-digit handover OTP and verified cargo custody at origin dock.'}
+                                </p>
+                              </div>
+                            </div>
+                            <span className="text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 border border-emerald-300 shrink-0">
+                              OTP: {selectedCargo.pickupCode || 'VERIFIED'}
+                            </span>
+                          </div>
+                        )}
 
                         {/* Details specifications */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 mt-5 sm:mt-6 text-xs text-slate-700">

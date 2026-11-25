@@ -12,7 +12,9 @@ import {
   Loader2,
   FileText,
   ShieldAlert,
-  ArrowRight
+  ArrowRight,
+  ShieldCheck,
+  KeyRound
 } from 'lucide-react';
 import { convertToTons } from '../data/logisticsData';
 
@@ -33,6 +35,7 @@ export default function ItemizedReceivingModal({
   const [items, setItems] = useState([]);
   const [shortageNote, setShortageNote] = useState('');
   const [shortageAction, setShortageAction] = useState('accept_with_endorsement'); // 'accept_with_endorsement' | 'reject_shortage'
+  const [pickupOtp, setPickupOtp] = useState('');
   const [validationError, setValidationError] = useState('');
 
   // Initialize product items when cargo opens
@@ -81,6 +84,7 @@ export default function ItemizedReceivingModal({
     setItems(initialProducts);
     setShortageNote(cargo.shortageNote || '');
     setShortageAction('accept_with_endorsement');
+    setPickupOtp('');
     setValidationError('');
   }, [cargo, isOpen]);
 
@@ -190,7 +194,20 @@ export default function ItemizedReceivingModal({
       return;
     }
 
+    if (shortageAction !== 'reject_shortage') {
+      const trimmedOtp = pickupOtp.trim();
+      if (!trimmedOtp || trimmedOtp.length !== 4 || !/^\d{4}$/.test(trimmedOtp)) {
+        setValidationError(
+          isUrdu
+            ? '4 ہندسوں کا شِپر ہینڈ اوور او ٹی پی (OTP) درج کرنا لازمی ہے۔'
+            : '4-digit Shipper Handover OTP is required to confirm physical receiving.'
+        );
+        return;
+      }
+    }
+
     const payload = {
+      pickupOtp: pickupOtp.trim(),
       status: shortageAction === 'reject_shortage' ? 'Rejected' : 'Accepted',
       rejectionReason: shortageAction === 'reject_shortage'
         ? (shortageNote.trim() || `Rejected due to cargo shortage: ${metrics.shortage} items missing.`)
@@ -524,6 +541,57 @@ export default function ItemizedReceivingModal({
                   ? `تمام ${metrics.totalDeclared} اشیاء مکمل اور درست حالت میں وصول کرلی گئیں۔ کوئی شارٹیج نہیں پائی گئی۔`
                   : `All ${metrics.totalDeclared} declared items counted and verified intact. No shortages detected.`}
               </span>
+            </div>
+          )}
+
+          {/* Shipper Handover OTP (Warehouse Gate-Pass Code) Verification Input */}
+          {shortageAction !== 'reject_shortage' && (
+            <div className="bg-gradient-to-r from-orange-50/90 to-amber-50/90 dark:from-orange-950/40 dark:to-amber-950/30 border-2 border-orange-400 dark:border-orange-500/60 p-4 rounded-2xl space-y-3 shadow-xs">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-orange-200/80 dark:border-orange-500/30 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck size={18} className="text-[#EA580C] shrink-0" />
+                  <span className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                    {isUrdu ? 'شِپر ہینڈ اوور او ٹی پی (گودام گیٹ پاس کوڈ) *' : 'Shipper Handover OTP (Warehouse Gate-Pass Code) *'}
+                  </span>
+                </div>
+                <span className="text-[10px] font-mono text-orange-800 dark:text-orange-200 font-bold bg-orange-100 dark:bg-orange-900/60 px-2.5 py-0.5 rounded-full border border-orange-300 dark:border-orange-700">
+                  {isUrdu ? '4 ہندسوں کا کوڈ' : '4-Digit Code'}
+                </span>
+              </div>
+
+              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                {isUrdu
+                  ? 'یہ 4 ہندسوں کا خفیہ کوڈ فیکٹری یا گودام مینیجر سے حاصل کریں جب تمام سامان ٹرک پر لوڈ اور گن لیا جائے۔'
+                  : 'Obtain this 4-digit code from the factory/warehouse manager once all items are physically verified and loaded.'}
+              </p>
+
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-1">
+                <div className="relative max-w-[200px]">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={4}
+                    value={pickupOtp}
+                    onChange={(e) => {
+                      setValidationError('');
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+                      setPickupOtp(val);
+                    }}
+                    placeholder="••••"
+                    className="w-full text-center tracking-[0.5em] font-mono font-black text-2xl py-2 px-3 rounded-xl border-2 border-orange-400 dark:border-orange-500 bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-orange-300 dark:focus:ring-orange-800 transition-all shadow-inner"
+                  />
+                </div>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                  {pickupOtp.length === 4 ? (
+                    <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
+                      <CheckCircle2 size={13} /> {isUrdu ? '4 ہندسے درج ہو گئے' : 'Ready to authenticate'}
+                    </span>
+                  ) : (
+                    isUrdu ? 'برائے مہربانی 4 ہندسے درج کریں' : 'Enter 4 digits provided by shipper at loading bay'
+                  )}
+                </span>
+              </div>
             </div>
           )}
 

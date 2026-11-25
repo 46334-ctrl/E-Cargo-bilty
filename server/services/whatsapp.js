@@ -108,6 +108,7 @@ const initWhatsApp = (io = null) => {
   try {
     const puppeteerConfig = {
       headless: true,
+      protocolTimeout: 120000,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
@@ -115,7 +116,11 @@ const initWhatsApp = (io = null) => {
         '--disable-accelerated-2d-canvas',
         '--no-first-run',
         '--no-zygote',
-        '--disable-gpu'
+        '--disable-gpu',
+        '--disable-blink-features=AutomationControlled',
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36'
       ]
     };
     if (chromePath) {
@@ -129,6 +134,10 @@ const initWhatsApp = (io = null) => {
       authTimeoutMs: 120000, // 2 minutes (prevents 'auth timeout' on cloud containers like Railway)
       takeoverOnConflict: true,
       takeoverTimeoutMs: 10000,
+      webVersionCache: {
+        type: 'remote',
+        remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.3000.1056230758-alpha.html'
+      },
       puppeteer: puppeteerConfig
     });
 
