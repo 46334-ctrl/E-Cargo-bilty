@@ -52,11 +52,14 @@ export const getStoredServerIP = () => {
     if (Capacitor.isNativePlatform()) {
       return PRODUCTION_SERVER_URL;
     }
-    if (window.location?.hostname && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    if (window.location?.hostname) {
+      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        return 'localhost';
+      }
       return window.location.hostname;
     }
   }
-  return Capacitor.isNativePlatform() ? PRODUCTION_SERVER_URL : DEFAULT_SERVER_IP;
+  return Capacitor.isNativePlatform() ? PRODUCTION_SERVER_URL : 'localhost';
 };
 
 export const getServerBaseUrl = () => {
@@ -97,7 +100,7 @@ export const getServerBaseUrl = () => {
       return normalized;
     }
 
-    if (isLiveProductionWeb) {
+    if (isLiveProductionWeb || window.location.port === '5000') {
       return window.location.origin;
     }
   }
