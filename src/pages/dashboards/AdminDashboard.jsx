@@ -1606,36 +1606,42 @@ export default function AdminDashboard() {
             <div className={`p-3.5 sm:p-4 rounded-xl border mb-4 flex flex-wrap items-center justify-between gap-2 ${
                 whatsappStatus.isReady
                 ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
-                : whatsappStatus.status === 'error'
-                  ? 'bg-rose-50 border-rose-300 text-rose-900'
-                  : whatsappStatus.hasQr
-                    ? 'bg-amber-50 border-amber-300 text-amber-900'
-                    : 'bg-slate-100 border-slate-300 text-slate-800'
+                : whatsappStatus.status === 'authenticated'
+                  ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
+                  : whatsappStatus.status === 'error'
+                    ? 'bg-rose-50 border-rose-300 text-rose-900'
+                    : whatsappStatus.hasQr
+                      ? 'bg-amber-50 border-amber-300 text-amber-900'
+                      : 'bg-slate-100 border-slate-300 text-slate-800'
               }`}>
               <div className="flex items-center gap-2">
                 <span className={`w-3 h-3 rounded-full ${
                   whatsappStatus.isReady
                     ? 'bg-emerald-500'
-                    : whatsappStatus.status === 'error'
-                      ? 'bg-rose-500'
-                      : whatsappStatus.hasQr
-                        ? 'bg-amber-500 animate-pulse'
-                        : 'bg-slate-400'
+                    : whatsappStatus.status === 'authenticated'
+                      ? 'bg-emerald-500 animate-pulse'
+                      : whatsappStatus.status === 'error'
+                        ? 'bg-rose-500'
+                        : whatsappStatus.hasQr
+                          ? 'bg-amber-500 animate-pulse'
+                          : 'bg-slate-400'
                 }`} />
                 <span className="font-extrabold text-sm">
                   {whatsappStatus.isReady
                     ? 'Gateway Online & Authenticated'
-                    : whatsappStatus.status === 'error'
-                      ? 'Gateway Error: Failed to Start Browser'
-                      : whatsappStatus.hasQr
-                        ? 'Action Required: Scan QR Code'
-                        : 'Gateway Initializing...'}
+                    : whatsappStatus.status === 'authenticated'
+                      ? 'WhatsApp Connected & Ready to Send'
+                      : whatsappStatus.status === 'error'
+                        ? 'Gateway Error: Failed to Start Browser'
+                        : whatsappStatus.hasQr
+                          ? 'Action Required: Scan QR Code'
+                          : 'Gateway Initializing...'}
                 </span>
               </div>
               <span className={`text-xs font-mono px-2 py-0.5 rounded border uppercase ${
                 whatsappStatus.status === 'error' ? 'bg-rose-100 text-rose-700 border-rose-300 font-bold' : 'bg-white/80 text-slate-700'
               }`}>
-                {whatsappStatus.status}
+                {whatsappStatus.isReady ? 'ready' : whatsappStatus.status}
               </span>
             </div>
 
@@ -1653,7 +1659,7 @@ export default function AdminDashboard() {
             )}
 
             {/* QR Code Section (if waiting for link) */}
-            {!whatsappStatus.isReady ? (
+            {(!whatsappStatus.isReady && whatsappStatus.status !== 'authenticated') ? (
               <div className="flex flex-col items-center justify-center p-4 bg-slate-50 border border-slate-200 rounded-xl mb-5 text-center">
                 <p className="text-xs font-bold text-slate-700 mb-3">
                   Open WhatsApp on your phone ➔ Linked Devices ➔ Link a Device ➔ Scan:
@@ -1754,7 +1760,7 @@ export default function AdminDashboard() {
                   className="flex-1 px-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 font-mono"
                 />
                 <button
-                  disabled={testSending || !whatsappStatus.isReady || !testPhone}
+                  disabled={testSending || (!whatsappStatus.isReady && whatsappStatus.status !== 'authenticated') || !testPhone}
                   onClick={async () => {
                     setTestSending(true);
                     setTestResult(null);
@@ -1765,7 +1771,7 @@ export default function AdminDashboard() {
                       });
                       setTestResult(res.data.success ? 'Message sent successfully!' : `Failed: ${res.data.reason || 'check number'}`);
                     } catch (err) {
-                      setTestResult('Error sending test message');
+                      setTestResult('Error sending test message: ' + (err.response?.data?.message || err.message));
                     } finally {
                       setTestSending(false);
                     }

@@ -245,9 +245,23 @@ const restartWhatsApp = async (clearSession = false) => {
  * Core function to send a text message via WhatsApp
  */
 const sendWhatsAppMessage = async (rawPhone, messageText) => {
-  if (!isReady || !client) {
-    console.log(`[WhatsApp Pending/Offline] Client not ready yet. Skipped WhatsApp to: ${rawPhone}`);
-    return { success: false, reason: 'client_not_ready' };
+  if (!client) {
+    console.log(`[WhatsApp Offline] Client not initialized. Skipped WhatsApp to: ${rawPhone}`);
+    return { success: false, reason: 'client_not_initialized' };
+  }
+
+  // If authenticated but ready event is still syncing chats, wait up to 10s for sync to complete
+  if (!isReady && clientStatus === 'authenticated') {
+    console.log(`[WhatsApp Syncing] Client is authenticated, waiting up to 10s for ready state...`);
+    for (let i = 0; i < 20; i++) {
+      if (isReady) break;
+      await new Promise(r => setTimeout(r, 500));
+    }
+  }
+
+  if (!isReady && clientStatus !== 'authenticated') {
+    console.log(`[WhatsApp Pending/Offline] Client not ready yet. Status: ${clientStatus}. Skipped WhatsApp to: ${rawPhone}`);
+    return { success: false, reason: 'client_not_ready', status: clientStatus };
   }
 
   const rawCleaned = (rawPhone || '').toString().replace(/[^0-9]/g, '');
@@ -266,13 +280,11 @@ const sendWhatsAppMessage = async (rawPhone, messageText) => {
   let targetChatId = `${cleaned}@c.us`;
 
   try {
-    // Verify with WhatsApp server if number is registered
+    // Check registered number ID if available, otherwise direct chat ID
     try {
-      const numberDetails = await client.getNumberId(cleaned);
+      const numberDetails = await client.getNumberId(cleaned).catch(() => null);
       if (numberDetails && numberDetails._serialized) {
         targetChatId = numberDetails._serialized;
-      } else {
-        console.warn(`⚠️ [WhatsApp Warning] ${rawPhone} (${cleaned}) is NOT registered on WhatsApp or not recognized!`);
       }
     } catch (lookupErr) {
       // fallback to targetChatId
