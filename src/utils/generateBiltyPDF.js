@@ -125,7 +125,7 @@ const buildBiltyPDFDoc = async (biltyData) => {
   // Bilty Details Section (Grid Alignment without label-value collisions)
   let currentY = marginY + 105;
   const leftLabelX = marginX + 15;
-  const leftValueX = marginX + 120;
+  const leftValueX = marginX + 128;
   const maxLeftValueWidth = (pageWidth / 2) - leftValueX - 10;
 
   doc.setFontSize(9.5);
@@ -148,14 +148,14 @@ const buildBiltyPDFDoc = async (biltyData) => {
   doc.text('Origin Depot:', leftLabelX, currentY);
   doc.setFont('helvetica', 'normal');
   const originText = biltyData.origin ? String(biltyData.origin) : 'N/A';
-  doc.text(originText.length > 24 ? originText.substring(0, 24) + '...' : originText, leftValueX, currentY);
+  doc.text(originText.length > 22 ? originText.substring(0, 22) + '...' : originText, leftValueX, currentY);
 
   currentY += 19;
   doc.setFont('helvetica', 'bold');
   doc.text('Consignor / Shipper:', leftLabelX, currentY);
   doc.setFont('helvetica', 'normal');
   const shipperName = biltyData.businessOwnerName || biltyData.businessName || 'Shipper Enterprise';
-  doc.text(shipperName.length > 24 ? shipperName.substring(0, 24) + '...' : shipperName, leftValueX, currentY);
+  doc.text(shipperName.length > 22 ? shipperName.substring(0, 22) + '...' : shipperName, leftValueX, currentY);
 
   if (biltyData.senderNTN) {
     currentY += 19;
@@ -167,7 +167,7 @@ const buildBiltyPDFDoc = async (biltyData) => {
 
   // Right Column
   const rightColX = pageWidth / 2 + 10;
-  const rightColValueX = rightColX + 90;
+  const rightColValueX = rightColX + 95;
   let currentYRight = marginY + 105;
 
   doc.setFont('helvetica', 'bold');

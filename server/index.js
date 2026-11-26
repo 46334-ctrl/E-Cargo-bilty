@@ -813,6 +813,27 @@ app.post('/api/cargo/:id/verify-pickup', authMiddleware, async (req, res) => {
       }
     }
 
+    // Trigger WhatsApp notification for cargo physically verified & loaded
+    (async () => {
+      try {
+        const shipper = updatedCargo.businessOwnerId ? await User.findByPk(updatedCargo.businessOwnerId) : null;
+        let recipients = [];
+        if (typeof updatedCargo.recipients === 'string') {
+          recipients = safeParseJson(updatedCargo.recipients, []);
+        } else if (Array.isArray(updatedCargo.recipients)) {
+          recipients = updatedCargo.recipients;
+        }
+        await notifyBookingStatusUpdate({
+          status: 'Loaded',
+          cargo: updatedCargo,
+          shipper,
+          recipients
+        });
+      } catch (err) {
+        console.error('WhatsApp verify-pickup notification error:', err.message);
+      }
+    })();
+
     io.emit('booking_updated');
     res.json({
       message: 'Warehouse pickup and cargo custody verified successfully!',
