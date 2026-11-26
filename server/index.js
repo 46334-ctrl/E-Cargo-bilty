@@ -1448,8 +1448,8 @@ app.get('/api/lost-cargo/:id', authMiddleware, async (req, res) => {
   }
 });
 
-// 4. Update status, location, resolution notes, and append investigation timeline log
-app.patch('/api/lost-cargo/:id', authMiddleware, async (req, res) => {
+// 4. Update status, location, resolution notes, and append investigation timeline log (with optional image evidence)
+app.patch('/api/lost-cargo/:id', authMiddleware, upload.single('evidenceImage'), async (req, res) => {
   if (req.user.role !== 'admin' && req.user.role !== 'transporter') {
     return res.status(403).json({ message: 'Only Admin and the assigned Transporter can update investigation status' });
   }
@@ -1479,6 +1479,23 @@ app.patch('/api/lost-cargo/:id', authMiddleware, async (req, res) => {
       updates.resolutionNotes = resolutionNotes.trim();
     }
 
+    // Process uploaded evidence/investigation photo if provided
+    let evidenceImageUrl = null;
+    if (req.file) {
+      const cloudUrl = await uploadToCloudinary(req.file.path, 'e_cargo_lost_evidence');
+      if (cloudUrl) {
+        evidenceImageUrl = cloudUrl;
+      } else {
+        evidenceImageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+      }
+    } else if (req.body.evidenceImageUrl) {
+      evidenceImageUrl = req.body.evidenceImageUrl;
+    }
+
+    if (evidenceImageUrl && !report.evidenceImageUrl) {
+      updates.evidenceImageUrl = evidenceImageUrl;
+    }
+
     await report.update(updates);
 
     // Append log entry to lost_cargo_logs
@@ -1491,7 +1508,8 @@ app.patch('/api/lost-cargo/:id', authMiddleware, async (req, res) => {
       updatedByUserId: req.user.id,
       role: req.user.role,
       actionNote: logNote,
-      statusChangedTo: status || report.status
+      statusChangedTo: status || report.status,
+      evidenceImageUrl: evidenceImageUrl || null
     });
 
     // Notify the customer who reported the missing cargo
@@ -1819,6 +1837,7 @@ const ensureSqliteColumns = async () => {
     `ALTER TABLE cargo ADD COLUMN has_shortage INTEGER DEFAULT 0;`,
     `ALTER TABLE cargo ADD COLUMN shortage_note TEXT;`,
     `ALTER TABLE cargo ADD COLUMN pickup_code TEXT;`,
+    `ALTER TABLE lost_cargo_logs ADD COLUMN evidence_image_url TEXT;`,
     `ALTER TABLE bookings ADD COLUMN delivery_code TEXT;`,
     `ALTER TABLE bookings ADD COLUMN receiver_signature TEXT;`,
     `ALTER TABLE bookings ADD COLUMN pod_photo_url TEXT;`,

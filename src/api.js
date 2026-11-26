@@ -342,7 +342,12 @@ export const lostCargoAPI = {
   }),
   getReports: (params) => api.get('/lost-cargo', { params }),
   getReportById: (id) => api.get(`/lost-cargo/${id}`),
-  updateReport: (id, data) => api.patch(`/lost-cargo/${id}`, data),
+  updateReport: (id, data) => {
+    const isFormData = typeof FormData !== 'undefined' && data instanceof FormData;
+    return api.patch(`/lost-cargo/${id}`, data, isFormData ? {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    } : {});
+  },
 };
 
 export { socket };

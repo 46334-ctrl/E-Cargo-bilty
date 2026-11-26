@@ -332,6 +332,11 @@ const LostCargoLog = sequelize.define('LostCargoLog', {
     allowNull: false,
     field: 'action_note'
   },
+  evidenceImageUrl: {
+    type: DataTypes.STRING(500),
+    allowNull: true,
+    field: 'evidence_image_url'
+  },
   statusChangedTo: {
     type: DataTypes.STRING(50),
     allowNull: true,

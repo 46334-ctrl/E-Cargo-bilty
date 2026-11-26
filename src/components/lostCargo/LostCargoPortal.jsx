@@ -56,6 +56,8 @@ export default function LostCargoPortal({ userRole = 'admin', currentUserId = nu
   const [newResolutionNotes, setNewResolutionNotes] = useState('');
   const [actionNote, setActionNote] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
+  const [investigationImageFile, setInvestigationImageFile] = useState(null);
+  const [investigationImagePreview, setInvestigationImagePreview] = useState(null);
 
   // Full-screen image preview modal
   const [fullImagePreview, setFullImagePreview] = useState(null);
@@ -114,6 +116,8 @@ export default function LostCargoPortal({ userRole = 'admin', currentUserId = nu
       setNewLocation(res.data.lastKnownLocation || '');
       setNewResolutionNotes(res.data.resolutionNotes || '');
       setActionNote('');
+      setInvestigationImageFile(null);
+      setInvestigationImagePreview(null);
     } catch (err) {
       console.error('Failed to load report detail:', err);
       toast.error('Failed to load detailed investigation data');
@@ -122,27 +126,53 @@ export default function LostCargoPortal({ userRole = 'admin', currentUserId = nu
     }
   };
 
+  const handleInvestigationImageChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        toast.warning(isUrdu ? 'برائے مہربانی درست تصویر کا انتخاب کریں' : 'Please select a valid image file');
+        return;
+      }
+      setInvestigationImageFile(file);
+      const url = URL.createObjectURL(file);
+      setInvestigationImagePreview(url);
+    }
+  };
+
+  const handleClearInvestigationImage = () => {
+    setInvestigationImageFile(null);
+    if (investigationImagePreview) {
+      URL.revokeObjectURL(investigationImagePreview);
+      setInvestigationImagePreview(null);
+    }
+  };
+
   const handleUpdateReport = async (e) => {
     e.preventDefault();
     if (!selectedReportId) return;
 
-    if (!actionNote.trim() && newStatus === reportDetail?.status) {
+    if (!actionNote.trim() && newStatus === reportDetail?.status && !investigationImageFile) {
       toast.warning(isUrdu ? 'برائے مہربانی تفتیشی نوٹ درج کریں یا اسٹیٹس تبدیل کریں' : 'Please provide an investigation note or update the status');
       return;
     }
 
     setIsUpdating(true);
     try {
-      const res = await lostCargoAPI.updateReport(selectedReportId, {
-        status: newStatus,
-        lastKnownLocation: newLocation,
-        resolutionNotes: newResolutionNotes,
-        actionNote: actionNote.trim()
-      });
+      const formData = new FormData();
+      formData.append('status', newStatus);
+      formData.append('lastKnownLocation', newLocation || '');
+      formData.append('resolutionNotes', newResolutionNotes || '');
+      formData.append('actionNote', actionNote.trim() || (investigationImageFile ? 'Investigation photo evidence uploaded' : 'Investigation status updated'));
+      if (investigationImageFile) {
+        formData.append('evidenceImage', investigationImageFile);
+      }
+
+      const res = await lostCargoAPI.updateReport(selectedReportId, formData);
 
       toast.success(isUrdu ? 'تفتیش کا ریکارڈ اپڈیٹ ہو گیا ہے' : 'Investigation status updated successfully');
       setReportDetail(res.data);
       setActionNote('');
+      handleClearInvestigationImage();
       fetchReports();
     } catch (err) {
       console.error('Failed to update report:', err);
@@ -647,6 +677,30 @@ export default function LostCargoPortal({ userRole = 'admin', currentUserId = nu
                           </span>
                         </div>
                         <p className="text-slate-700 dark:text-slate-300">{log.actionNote}</p>
+                        {(log.evidenceImageUrl || log.evidence_image_url) && (
+                          <div className="mt-2">
+                            <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                              <Camera size={11} className="text-orange-500" />
+                              <span>{isUrdu ? 'منسلک تفتیشی تصویر' : 'Attached Photo Evidence'}</span>
+                            </div>
+                            <div className="relative inline-block group">
+                              <img
+                                src={resolveAssetUrl(log.evidenceImageUrl || log.evidence_image_url)}
+                                alt="Log Evidence"
+                                className="w-28 h-20 sm:w-36 sm:h-24 object-cover rounded-xl border border-slate-300 dark:border-slate-700 shadow-xs cursor-pointer group-hover:opacity-90 transition-opacity"
+                                onClick={() => setFullImagePreview(resolveAssetUrl(log.evidenceImageUrl || log.evidence_image_url))}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setFullImagePreview(resolveAssetUrl(log.evidenceImageUrl || log.evidence_image_url))}
+                                className="absolute bottom-1.5 right-1.5 p-1 rounded-md bg-black/70 text-white hover:bg-black transition-colors cursor-pointer"
+                                title="Open Full Image"
+                              >
+                                <Maximize2 size={12} />
+                              </button>
+                            </div>
+                          </div>
+                        )}
                         {log.statusChangedTo && (
                           <span className="inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                             Status: {log.statusChangedTo}
@@ -703,12 +757,87 @@ export default function LostCargoPortal({ userRole = 'admin', currentUserId = nu
                       </label>
                       <input
                         type="text"
-                        required
+                        required={!investigationImageFile}
                         value={actionNote}
                         onChange={(e) => setActionNote(e.target.value)}
                         placeholder="e.g. Contacted driver, verified weighbridge CCTV, cargo located in Sukkur terminal warehouse..."
                         className="w-full p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-red-500 text-xs"
                       />
+                    </div>
+
+                    {/* Investigation Photo Evidence Upload */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                          <Camera size={13} className="text-orange-500" />
+                          <span>{isUrdu ? 'تفتیشی تصویر / ثبوت اپلوڈ کریں (اختیاری)' : 'Upload Investigation Photo Evidence (Optional)'}</span>
+                        </label>
+                        {investigationImageFile && (
+                          <button
+                            type="button"
+                            onClick={handleClearInvestigationImage}
+                            className="text-[10px] text-red-600 hover:text-red-700 font-bold cursor-pointer"
+                          >
+                            {isUrdu ? 'تصویر ہٹائیں' : 'Remove Image'}
+                          </button>
+                        )}
+                      </div>
+
+                      {!investigationImagePreview ? (
+                        <label className="border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-orange-500 dark:hover:border-orange-500 rounded-xl p-3 flex flex-col sm:flex-row items-center justify-center gap-2 cursor-pointer bg-white/60 dark:bg-slate-900/60 hover:bg-orange-500/5 transition-all group text-center sm:text-left">
+                          <div className="w-8 h-8 rounded-lg bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                            <Camera size={16} />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                              {isUrdu ? 'تصویر منتخب کریں یا کیمرے سے لیں' : 'Click to upload photo evidence (or capture on mobile)'}
+                            </p>
+                            <p className="text-[10px] text-slate-500">
+                              {isUrdu ? 'سی سی ٹی وی کی تصویر، کانٹا پرچی، برآمد شدہ مال یا چیک پوائنٹ رسید' : 'Supports CCTV snapshot, weighbridge slip, terminal receipt, or recovered cargo photo (JPG, PNG)'}
+                            </p>
+                          </div>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleInvestigationImageChange}
+                            className="hidden"
+                          />
+                        </label>
+                      ) : (
+                        <div className="flex items-center gap-3 p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-300 dark:border-slate-700 shadow-2xs">
+                          <div className="relative group shrink-0">
+                            <img
+                              src={investigationImagePreview}
+                              alt="Investigation Preview"
+                              className="w-16 h-16 object-cover rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer"
+                              onClick={() => setFullImagePreview(investigationImagePreview)}
+                            />
+                            <span 
+                              onClick={() => setFullImagePreview(investigationImagePreview)}
+                              className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white rounded-lg transition-opacity cursor-pointer"
+                              title="Enlarge preview"
+                            >
+                              <Maximize2 size={13} />
+                            </span>
+                          </div>
+                          <div className="min-w-0 flex-1 text-xs">
+                            <p className="font-bold text-slate-900 dark:text-white truncate">
+                              {investigationImageFile?.name}
+                            </p>
+                            <p className="text-[11px] text-slate-500 font-mono mt-0.5">
+                              {(investigationImageFile?.size / 1024).toFixed(1)} KB &bull; <span className="text-emerald-600 font-bold">{isUrdu ? 'اپلوڈ کے لیے تیار' : 'Ready to attach'}</span>
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleClearInvestigationImage}
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                            title="Remove image"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     <div>
