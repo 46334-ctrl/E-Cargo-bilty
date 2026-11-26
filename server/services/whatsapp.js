@@ -1,12 +1,13 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
-const qrcode = require('qrcode-terminal');
+const qrcodeTerminal = require('qrcode-terminal');
+const QRCode = require('qrcode');
 const path = require('path');
-
 const fs = require('fs');
 
 let client = null;
 let isReady = false;
 let latestQr = null;
+let latestQrDataUrl = null;
 let lastError = null;
 let clientStatus = 'disconnected'; // 'disconnected' | 'initializing' | 'qr_ready' | 'authenticated' | 'ready' | 'error'
 let ioInstance = null;
@@ -109,18 +110,16 @@ const initWhatsApp = (io = null) => {
     const puppeteerConfig = {
       headless: true,
       protocolTimeout: 120000,
+      defaultViewport: { width: 1280, height: 800 },
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-accelerated-2d-canvas',
         '--no-first-run',
-        '--no-zygote',
-        '--disable-gpu',
         '--disable-blink-features=AutomationControlled',
         '--disable-background-timer-throttling',
-        '--disable-backgrounding-occluded-windows',
-        '--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36'
+        '--disable-backgrounding-occluded-windows'
       ]
     };
     if (chromePath) {
@@ -142,22 +141,29 @@ const initWhatsApp = (io = null) => {
     });
 
 
-    client.on('qr', (qr) => {
+    client.on('qr', async (qr) => {
       latestQr = qr;
       clientStatus = 'qr_ready';
+      try {
+        latestQrDataUrl = await QRCode.toDataURL(qr, { margin: 1, width: 320 });
+      } catch (e) {
+        latestQrDataUrl = null;
+      }
+
       console.log('\n================== WHATSAPP LOGIN QR CODE ==================');
       console.log('Scan this QR code using WhatsApp on your phone (Linked Devices):');
-      qrcode.generate(qr, { small: true });
+      qrcodeTerminal.generate(qr, { small: true });
       console.log('============================================================\n');
 
       if (ioInstance) {
-        ioInstance.emit('whatsapp_qr', { qr, status: 'qr_ready' });
+        ioInstance.emit('whatsapp_qr', { qr, qrDataUrl: latestQrDataUrl, status: 'qr_ready' });
       }
     });
 
     client.on('authenticated', () => {
       clientStatus = 'authenticated';
       latestQr = null;
+      latestQrDataUrl = null;
       console.log('✅ WhatsApp Web Client Authenticated');
       if (ioInstance) {
         ioInstance.emit('whatsapp_status', { status: 'authenticated' });
@@ -166,6 +172,7 @@ const initWhatsApp = (io = null) => {
 
     client.on('auth_failure', (msg) => {
       clientStatus = 'error';
+      latestQrDataUrl = null;
       console.error('❌ WhatsApp Web Authentication Failed:', msg);
       if (ioInstance) {
         ioInstance.emit('whatsapp_status', { status: 'auth_failure', error: msg });
@@ -176,6 +183,7 @@ const initWhatsApp = (io = null) => {
       isReady = true;
       clientStatus = 'ready';
       latestQr = null;
+      latestQrDataUrl = null;
       const myNum = client?.info?.wid?.user || 'Unknown';
       console.log(`🚀 WhatsApp Web Client is READY! Messages will be sent automatically. (Logged in as: ${myNum})`);
       if (ioInstance) {
@@ -226,6 +234,7 @@ const restartWhatsApp = async (clearSession = false) => {
     }
     isReady = false;
     latestQr = null;
+    latestQrDataUrl = null;
     lastError = null;
     clientStatus = 'initializing';
     if (ioInstance) {
@@ -504,6 +513,7 @@ module.exports = {
     isReady,
     hasQr: Boolean(latestQr),
     qr: latestQr,
+    qrDataUrl: latestQrDataUrl,
     error: lastError,
     myNumber: client?.info?.wid?.user || null
   })

@@ -267,7 +267,25 @@ app.get('/api/whatsapp/status', authMiddleware, (req, res) => {
   res.json(getWhatsAppStatus());
 });
 
+app.get('/api/whatsapp/public-status', async (req, res) => {
+  const status = getWhatsAppStatus();
+  let qrDataUrl = null;
+  if (status.qr) {
+    try {
+      const QRCode = require('qrcode');
+      qrDataUrl = await QRCode.toDataURL(status.qr, { margin: 1, width: 320 });
+    } catch (e) {}
+  }
+  res.json({ ...status, qrDataUrl });
+});
+
 app.post('/api/whatsapp/restart', authMiddleware, async (req, res) => {
+  const { clearSession } = req.body || {};
+  const result = await restartWhatsApp(Boolean(clearSession));
+  res.json(result);
+});
+
+app.post('/api/whatsapp/public-restart', async (req, res) => {
   const { clearSession } = req.body || {};
   const result = await restartWhatsApp(Boolean(clearSession));
   res.json(result);
@@ -278,6 +296,211 @@ app.post('/api/whatsapp/test', authMiddleware, async (req, res) => {
   if (!phone) return res.status(400).json({ message: 'Phone number is required' });
   const result = await sendWhatsAppMessage(phone, message || 'Hello from E-Cargo-Bilty WhatsApp Service!');
   res.json(result);
+});
+
+app.post('/api/whatsapp/public-test', async (req, res) => {
+  const { phone, message } = req.body;
+  if (!phone) return res.status(400).json({ message: 'Phone number is required' });
+  const result = await sendWhatsAppMessage(phone, message || '🧪 Test WhatsApp Notification from E-Cargo-Bilty Gateway!');
+  res.json(result);
+});
+
+// Standalone WhatsApp Gateway Web Portal for easy browser QR scanning
+app.get(['/whatsapp', '/api/whatsapp/view'], (req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>E-Cargo-Bilty • WhatsApp Gateway</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
+    body { background: #0B1325; color: #f8fafc; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+    .card { background: #131E36; border: 1px solid rgba(255,255,255,0.12); border-radius: 24px; padding: 32px; max-width: 480px; width: 100%; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); text-align: center; }
+    .badge { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 9999px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 20px; }
+    .badge.ready { background: rgba(16,185,129,0.15); color: #34d399; border: 1px solid rgba(16,185,129,0.3); }
+    .badge.qr { background: rgba(245,158,11,0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.3); }
+    .badge.disconnected { background: rgba(239,68,68,0.15); color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
+    .dot { width: 8px; height: 8px; border-radius: 50%; }
+    .dot.ready { background: #10b981; box-shadow: 0 0 10px #10b981; }
+    .dot.qr { background: #f59e0b; box-shadow: 0 0 10px #f59e0b; animation: pulse 1.5s infinite; }
+    .dot.disconnected { background: #ef4444; }
+    @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.3); } }
+    h1 { font-size: 22px; font-weight: 800; margin-bottom: 6px; color: #fff; }
+    p.subtitle { font-size: 13px; color: #94a3b8; margin-bottom: 24px; }
+    .qr-container { background: #ffffff; padding: 16px; border-radius: 16px; display: inline-block; box-shadow: 0 10px 25px rgba(0,0,0,0.3); margin-bottom: 20px; min-height: 272px; min-width: 272px; display: flex; align-items: center; justify-content: center; position: relative; }
+    .qr-container img { width: 240px; height: 240px; display: block; border-radius: 8px; }
+    .steps { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 14px 18px; text-align: left; font-size: 12px; color: #cbd5e1; line-height: 1.6; margin-bottom: 20px; }
+    .steps ol { padding-left: 20px; }
+    .steps li { margin-bottom: 4px; }
+    .steps strong { color: #f8fafc; }
+    .btn-group { display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; }
+    button { background: #2563eb; color: #fff; border: none; padding: 10px 18px; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+    button:hover { background: #1d4ed8; transform: translateY(-1px); }
+    button.secondary { background: rgba(255,255,255,0.08); color: #cbd5e1; border: 1px solid rgba(255,255,255,0.12); }
+    button.secondary:hover { background: rgba(255,255,255,0.15); color: #fff; }
+    button.danger { background: rgba(239,68,68,0.15); color: #fca5a5; border: 1px solid rgba(239,68,68,0.3); }
+    button.danger:hover { background: rgba(239,68,68,0.25); color: #fff; }
+    .test-box { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 16px; margin-top: 10px; text-align: left; }
+    .test-box label { font-size: 11px; font-weight: 700; text-transform: uppercase; color: #94a3b8; display: block; margin-bottom: 6px; }
+    .test-box input { width: 100%; background: #0B1325; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 8px 12px; color: #fff; font-size: 13px; font-family: 'JetBrains Mono', monospace; margin-bottom: 10px; outline: none; }
+    .test-box input:focus { border-color: #3b82f6; }
+    .test-result { font-size: 11px; margin-top: 8px; padding: 6px 10px; border-radius: 6px; font-family: 'JetBrains Mono', monospace; }
+    .test-result.success { background: rgba(16,185,129,0.15); color: #34d399; }
+    .test-result.error { background: rgba(239,68,68,0.15); color: #f87171; }
+    .connected-card { background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.3); border-radius: 16px; padding: 24px; margin-bottom: 20px; }
+    .connected-card h2 { color: #34d399; font-size: 18px; margin-bottom: 6px; }
+    .phone-number { font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 700; color: #fff; background: rgba(0,0,0,0.3); display: inline-block; padding: 4px 12px; border-radius: 8px; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div id="statusBadge" class="badge qr">
+      <span class="dot qr"></span>
+      <span id="statusText">Checking Gateway...</span>
+    </div>
+
+    <h1>WhatsApp Notification Gateway</h1>
+    <p class="subtitle">Real-Time Logistics Alerts for e-Bilty, Transits & PODs</p>
+
+    <!-- QR Code View -->
+    <div id="qrSection">
+      <div class="qr-container">
+        <img id="qrImg" src="" alt="WhatsApp QR Code" style="display:none;" />
+        <div id="qrLoading" style="color:#64748b; font-size:13px; font-weight:600;">Generating live QR code...</div>
+      </div>
+
+      <div class="steps">
+        <ol>
+          <li>Open <strong>WhatsApp</strong> on your mobile phone</li>
+          <li>Tap <strong>Settings</strong> (or 3-dots on Android) ➔ <strong>Linked Devices</strong></li>
+          <li>Tap <strong>Link a Device</strong> and point your camera here</li>
+        </ol>
+      </div>
+
+      <div class="btn-group">
+        <button class="secondary" onclick="fetchStatus()">🔄 Refresh QR</button>
+        <button class="danger" onclick="resetSession()">🗑️ Reset Session</button>
+      </div>
+    </div>
+
+    <!-- Connected View -->
+    <div id="connectedSection" style="display:none;">
+      <div class="connected-card">
+        <h2>✅ Gateway Connected & Active</h2>
+        <p style="font-size:12px; color:#cbd5e1; margin-top:4px;">WhatsApp Web session is authenticated and ready to dispatch milestone notifications.</p>
+        <div id="myNumberDisplay" class="phone-number">+92 3XX XXXXXXX</div>
+      </div>
+      <div class="btn-group">
+        <button class="danger" onclick="resetSession()">Disconnect / Logout</button>
+      </div>
+    </div>
+
+    <!-- Live Test Message Box -->
+    <div class="test-box">
+      <label>⚡ Send Test WhatsApp Alert</label>
+      <input type="text" id="testPhone" placeholder="03XX-XXXXXXX (e.g. 03135151023)" value="03135151023" />
+      <button onclick="sendTestMessage()" style="width:100%;">Send Test Message</button>
+      <div id="testResult" style="display:none;" class="test-result"></div>
+    </div>
+  </div>
+
+  <script>
+    async function fetchStatus() {
+      try {
+        const res = await fetch('/api/whatsapp/public-status');
+        const data = await res.json();
+        const badge = document.getElementById('statusBadge');
+        const statusText = document.getElementById('statusText');
+        const dot = badge.querySelector('.dot');
+        const qrSection = document.getElementById('qrSection');
+        const connectedSection = document.getElementById('connectedSection');
+        const qrImg = document.getElementById('qrImg');
+        const qrLoading = document.getElementById('qrLoading');
+
+        if (data.isReady || data.status === 'ready' || data.status === 'authenticated') {
+          badge.className = 'badge ready';
+          dot.className = 'dot ready';
+          statusText.textContent = 'Active & Connected';
+          qrSection.style.display = 'none';
+          connectedSection.style.display = 'block';
+          if (data.myNumber) {
+            document.getElementById('myNumberDisplay').textContent = '+' + data.myNumber;
+          }
+        } else if (data.hasQr && data.qrDataUrl) {
+          badge.className = 'badge qr';
+          dot.className = 'dot qr';
+          statusText.textContent = 'Action Required: Scan QR';
+          qrSection.style.display = 'block';
+          connectedSection.style.display = 'none';
+          qrImg.src = data.qrDataUrl;
+          qrImg.style.display = 'block';
+          qrLoading.style.display = 'none';
+        } else {
+          badge.className = 'badge disconnected';
+          dot.className = 'dot disconnected';
+          statusText.textContent = data.status === 'initializing' ? 'Initializing Browser...' : 'Generating QR Code...';
+          qrImg.style.display = 'none';
+          qrLoading.style.display = 'block';
+        }
+      } catch (err) {
+        console.error('Failed to fetch WhatsApp status:', err);
+      }
+    }
+
+    async function resetSession() {
+      if (!confirm('Are you sure you want to reset the WhatsApp session and generate a new QR code?')) return;
+      try {
+        document.getElementById('statusText').textContent = 'Resetting session...';
+        await fetch('/api/whatsapp/public-restart', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ clearSession: true })
+        });
+        setTimeout(fetchStatus, 2000);
+      } catch (e) {
+        alert('Failed to reset: ' + e.message);
+      }
+    }
+
+    async function sendTestMessage() {
+      const phone = document.getElementById('testPhone').value.trim();
+      const resultDiv = document.getElementById('testResult');
+      if (!phone) { alert('Please enter a phone number'); return; }
+
+      resultDiv.style.display = 'block';
+      resultDiv.className = 'test-result';
+      resultDiv.textContent = 'Sending message to ' + phone + '...';
+
+      try {
+        const res = await fetch('/api/whatsapp/public-test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone, message: '🚚 *E-Cargo-Bilty WhatsApp Gateway Test*\\n\\nYour WhatsApp alert integration is connected and working perfectly!' })
+        });
+        const d = await res.json();
+        if (d.success) {
+          resultDiv.className = 'test-result success';
+          resultDiv.textContent = '✅ Message sent successfully to ' + phone + '!';
+        } else {
+          resultDiv.className = 'test-result error';
+          resultDiv.textContent = '❌ Failed: ' + (d.reason || d.message || 'Client not ready');
+        }
+      } catch (e) {
+        resultDiv.className = 'test-result error';
+        resultDiv.textContent = '❌ Network error: ' + e.message;
+      }
+    }
+
+    // Auto-poll status every 3 seconds
+    fetchStatus();
+    setInterval(fetchStatus, 3000);
+  </script>
+</body>
+</html>`);
 });
 
 
