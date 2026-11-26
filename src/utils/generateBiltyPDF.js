@@ -68,6 +68,12 @@ const buildBiltyPDFDoc = async (biltyData) => {
   doc.setDrawColor(51, 65, 85);
   doc.rect(marginX, marginY, pageWidth - marginX * 2, pageHeight - marginY * 2);
 
+  // Background Watermark (Rendered first so text & tables sit cleanly on top)
+  doc.setFontSize(48);
+  doc.setTextColor(245, 247, 250);
+  doc.setFont('helvetica', 'bold');
+  doc.text('VERIFIED E-BILTY', pageWidth / 2, pageHeight / 2 - 20, { align: 'center', angle: -30 });
+
   // Header Background (Deep Charcoal matching Logo Truck)
   doc.setFillColor(30, 41, 59);
   doc.rect(marginX, marginY, pageWidth - marginX * 2, 75, 'F');
@@ -116,81 +122,86 @@ const buildBiltyPDFDoc = async (biltyData) => {
   doc.setDrawColor(234, 88, 12);
   doc.line(marginX, marginY + 80, pageWidth - marginX, marginY + 80);
 
-  // Bilty Details Section
+  // Bilty Details Section (Grid Alignment without label-value collisions)
   let currentY = marginY + 105;
-  doc.setFontSize(10);
+  const leftLabelX = marginX + 15;
+  const leftValueX = marginX + 120;
+  const maxLeftValueWidth = (pageWidth / 2) - leftValueX - 10;
+
+  doc.setFontSize(9.5);
   doc.setTextColor(0, 0, 0);
 
   // Left Column
   doc.setFont('helvetica', 'bold');
-  doc.text('Bilty ID / No:', marginX + 20, currentY);
+  doc.text('Bilty ID / No:', leftLabelX, currentY);
   doc.setFont('helvetica', 'normal');
-  doc.text(`BLT-${idStr.slice(0, 8).toUpperCase()}`, marginX + 105, currentY);
+  doc.text(`BLT-${idStr.slice(0, 8).toUpperCase()}`, leftValueX, currentY);
 
-  currentY += 20;
+  currentY += 19;
   doc.setFont('helvetica', 'bold');
-  doc.text('Date Issued:', marginX + 20, currentY);
+  doc.text('Date Issued:', leftLabelX, currentY);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${new Date(dateVal).toLocaleDateString()} ${new Date(dateVal).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`, marginX + 105, currentY);
+  doc.text(`${new Date(dateVal).toLocaleDateString()} ${new Date(dateVal).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`, leftValueX, currentY);
 
-  currentY += 20;
+  currentY += 19;
   doc.setFont('helvetica', 'bold');
-  doc.text('Origin Depot:', marginX + 20, currentY);
+  doc.text('Origin Depot:', leftLabelX, currentY);
   doc.setFont('helvetica', 'normal');
   const originText = biltyData.origin ? String(biltyData.origin) : 'N/A';
-  doc.text(originText.length > 25 ? originText.substring(0, 25) + '...' : originText, marginX + 105, currentY);
+  doc.text(originText.length > 24 ? originText.substring(0, 24) + '...' : originText, leftValueX, currentY);
 
-  currentY += 20;
+  currentY += 19;
   doc.setFont('helvetica', 'bold');
-  doc.text('Consignor/Shipper:', marginX + 20, currentY);
+  doc.text('Consignor / Shipper:', leftLabelX, currentY);
   doc.setFont('helvetica', 'normal');
   const shipperName = biltyData.businessOwnerName || biltyData.businessName || 'Shipper Enterprise';
-  doc.text(shipperName.length > 25 ? shipperName.substring(0, 25) + '...' : shipperName, marginX + 105, currentY);
+  doc.text(shipperName.length > 24 ? shipperName.substring(0, 24) + '...' : shipperName, leftValueX, currentY);
 
   if (biltyData.senderNTN) {
-    currentY += 18;
+    currentY += 19;
     doc.setFont('helvetica', 'bold');
-    doc.text('Sender NTN / Tax ID:', marginX + 20, currentY);
+    doc.text('Sender NTN / Tax ID:', leftLabelX, currentY);
     doc.setFont('helvetica', 'normal');
-    doc.text(`${biltyData.senderNTN}`, marginX + 130, currentY);
+    doc.text(`${biltyData.senderNTN}`, leftValueX, currentY);
   }
 
   // Right Column
   const rightColX = pageWidth / 2 + 10;
+  const rightColValueX = rightColX + 90;
   let currentYRight = marginY + 105;
 
   doc.setFont('helvetica', 'bold');
   doc.text('Transporter:', rightColX, currentYRight);
   doc.setFont('helvetica', 'normal');
   const transName = biltyData.transporterName || 'Verified Transporter';
-  doc.text(transName.length > 22 ? transName.substring(0, 22) + '...' : transName, rightColX + 85, currentYRight);
+  doc.text(transName.length > 22 ? transName.substring(0, 22) + '...' : transName, rightColValueX, currentYRight);
 
-  currentYRight += 20;
+  currentYRight += 19;
   doc.setFont('helvetica', 'bold');
   doc.text('Truck Plate:', rightColX, currentYRight);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${biltyData.truckPlate || 'Unassigned'}`, rightColX + 85, currentYRight);
+  doc.text(`${biltyData.truckPlate || 'Unassigned'}`, rightColValueX, currentYRight);
 
-  currentYRight += 20;
+  currentYRight += 19;
   doc.setFont('helvetica', 'bold');
   doc.text('Destination Hub:', rightColX, currentYRight);
   doc.setFont('helvetica', 'normal');
   const destText = biltyData.destination ? String(biltyData.destination) : 'N/A';
-  doc.text(destText.length > 22 ? destText.substring(0, 22) + '...' : destText, rightColX + 85, currentYRight);
+  doc.text(destText.length > 22 ? destText.substring(0, 22) + '...' : destText, rightColValueX, currentYRight);
 
   // Payment Terms Stamp Banner
-  currentYRight += 20;
+  currentYRight += 19;
   const paymentTerms = biltyData.paymentTerms || 'Prepaid';
   const isPrepaid = paymentTerms.toLowerCase().includes('prepaid');
   const isNet30 = paymentTerms.toLowerCase().includes('net-30') || paymentTerms.toLowerCase().includes('corp');
   
   const stampBg = isPrepaid ? [16, 185, 129] : isNet30 ? [51, 65, 85] : [234, 88, 12];
   doc.setFillColor(stampBg[0], stampBg[1], stampBg[2]);
-  doc.roundedRect(rightColX, currentYRight - 11, 140, 18, 3, 3, 'F');
+  doc.roundedRect(rightColX, currentYRight - 11, 145, 18, 3, 3, 'F');
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   doc.setTextColor(255, 255, 255);
-  doc.text(`TERMS: ${paymentTerms.toUpperCase()}`, rightColX + 70, currentYRight + 1, { align: 'center' });
+  doc.text(`TERMS: ${paymentTerms.toUpperCase()}`, rightColX + 72.5, currentYRight + 1, { align: 'center' });
 
   // Divider
   currentY = Math.max(currentY, currentYRight) + 24;
@@ -257,18 +268,32 @@ const buildBiltyPDFDoc = async (biltyData) => {
     ],
   });
 
-  // Totals Area
-  currentY = doc.lastAutoTable.finalY + 20;
+  // Totals Summary Box (Aligned with AutoTable boundaries, guaranteed zero overlap)
+  const totalsBoxY = doc.lastAutoTable.finalY + 8;
+  const totalsBoxHeight = 26;
+  const tableLeftX = marginX + 10;
+  const tableRightX = pageWidth - marginX - 10;
+  const tableWidth = tableRightX - tableLeftX;
+
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(203, 213, 225);
+  doc.setLineWidth(0.8);
+  doc.roundedRect(tableLeftX, totalsBoxY, tableWidth, totalsBoxHeight, 3, 3, 'FD');
+
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(11);
-  doc.setTextColor(0, 0, 0);
-  doc.text('Total Agreed Freight:', pageWidth - marginX - 210, currentY);
+  doc.setFontSize(10.5);
+  doc.setTextColor(15, 23, 42);
+  doc.text('Total Agreed Freight:', tableLeftX + 14, totalsBoxY + 17);
+
+  doc.setFontSize(11.5);
   doc.setTextColor(234, 88, 12);
-  doc.text(formattedFreight, pageWidth - marginX - 70, currentY, { align: 'right' });
+  doc.text(formattedFreight, tableRightX - 14, totalsBoxY + 17, { align: 'right' });
+
+  currentY = totalsBoxY + totalsBoxHeight + 8;
 
   // Delivery Notes if present
   if (biltyData.deliveryNotes) {
-    currentY += 16;
+    currentY += 10;
     doc.setFont('helvetica', 'italic');
     doc.setFontSize(8.5);
     doc.setTextColor(80, 80, 80);
@@ -281,12 +306,12 @@ const buildBiltyPDFDoc = async (biltyData) => {
   }
 
   // Terms and Conditions
-  currentY += 22;
+  currentY += 18;
   doc.setLineWidth(0.5);
   doc.setDrawColor(200, 200, 200);
   doc.line(marginX, currentY, pageWidth - marginX, currentY);
 
-  currentY += 15;
+  currentY += 14;
   doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(0, 0, 0);
@@ -318,7 +343,7 @@ const buildBiltyPDFDoc = async (biltyData) => {
   }
 
   // Signatures Section with Touchscreen e-POD embedding (clamped safely inside page border)
-  currentY = Math.min(currentY + 55, pageHeight - marginY - 26);
+  currentY = Math.min(currentY + 50, pageHeight - marginY - 26);
   doc.setLineWidth(0.5);
   doc.setDrawColor(0, 0, 0);
   doc.line(marginX + 20, currentY, marginX + 180, currentY);
@@ -333,25 +358,19 @@ const buildBiltyPDFDoc = async (biltyData) => {
     }
   }
 
-  currentY += 12;
+  currentY += 14;
   doc.setFontSize(9);
   doc.setTextColor(0, 0, 0);
   doc.setFont('helvetica', 'bold');
-  doc.text('Transporter / Driver Sign', marginX + 20, currentY);
+  doc.text('Transporter / Driver Signature', marginX + 20, currentY);
   
   if (biltyData.receiverSignature) {
     doc.setTextColor(16, 185, 129);
-    doc.text('Consignee (e-POD Verified)', pageWidth - marginX - 180, currentY);
+    doc.text('Consignee (e-POD Verified ✓)', pageWidth - marginX - 180, currentY);
   } else {
     doc.setTextColor(0, 0, 0);
     doc.text('Consignee Signature', pageWidth - marginX - 180, currentY);
   }
-
-  // Light watermark text
-  doc.setFontSize(50);
-  doc.setTextColor(241, 245, 249);
-  doc.setFont('helvetica', 'bold');
-  doc.text('VERIFIED E-BILTY', pageWidth / 2, pageHeight / 2 + 50, { align: 'center', angle: -30 });
 
   return doc;
 };
