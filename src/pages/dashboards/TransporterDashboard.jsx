@@ -613,10 +613,10 @@ export default function TransporterDashboard() {
           <div className="space-y-6 text-left">
             {/* Shortcut banner to accepted unassigned cargo if any */}
             {acceptedUnassignedCargo.length > 0 && (
-              <div className="bg-amber-500/10 border border-amber-400/30 rounded-2xl p-3.5 px-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs">
-                <div className="flex items-center gap-2 text-amber-200 font-medium">
-                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping shrink-0" />
-                  <span>
+              <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-300 dark:border-amber-400/30 rounded-2xl p-3.5 px-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs">
+                <div className="flex items-center gap-2 text-black dark:text-white font-semibold">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping shrink-0" />
+                  <span className="text-black dark:text-white">
                     {isUrdu 
                       ? `آپ کے پاس ${acceptedUnassignedCargo.length} قبول شدہ کارگو موجود ہیں جن پر ٹرک مختص کرنا باقی ہے۔` 
                       : `You have ${acceptedUnassignedCargo.length} accepted shipment(s) waiting for fleet truck allocation.`}
