@@ -182,3 +182,21 @@ if (modified) {
 } else {
   console.log('patch-wwebjs: No patches needed or already patched.');
 }
+
+// 8. Patch LocalAuth.js logout so Windows EBUSY file locks do not crash the server
+const localAuthJsPath = path.join(__dirname, 'node_modules/whatsapp-web.js/src/authStrategies/LocalAuth.js');
+if (fs.existsSync(localAuthJsPath)) {
+  let localAuthContent = fs.readFileSync(localAuthJsPath, 'utf8');
+  const badLocalAuthLogout = `                .catch((e) => {
+                    throw new Error(e);
+                });`;
+  const safeLocalAuthLogout = `                .catch((e) => {
+                    console.warn('[patch-wwebjs] LocalAuth logout: userDataDir locked or busy (ignored safely):', e.message);
+                });`;
+  if (localAuthContent.includes(badLocalAuthLogout)) {
+    localAuthContent = localAuthContent.replace(badLocalAuthLogout, safeLocalAuthLogout);
+    fs.writeFileSync(localAuthJsPath, localAuthContent, 'utf8');
+    console.log('patch-wwebjs: Applied safe fix for LocalAuth.js EBUSY crash');
+  }
+}
+

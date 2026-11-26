@@ -27,6 +27,15 @@ const {
 
 const app = express();
 
+// Global crash resilience for unhandled background I/O & browser driver exceptions
+process.on('uncaughtException', (err) => {
+  console.warn('⚠️ Process uncaughtException caught gracefully (server kept running):', err.message);
+});
+process.on('unhandledRejection', (reason) => {
+  console.warn('⚠️ Process unhandledRejection caught gracefully (server kept running):', reason?.message || reason);
+});
+
+
 // Allow Chromium Private Network Access (http://localhost WebView -> LAN IP) alongside CORS
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Private-Network', 'true');
